@@ -57,8 +57,6 @@ Gameplay showcase youtube link: [Video link](https://youtu.be/rpumewPLAHc)
 
 ## 1. Overview
 
-### Disclaimer: the README was written by Claude, provided only with the current versions of the scripts and in depth explanations of the mechanics, without having seen the editor
-
 The game is built around one idea: **moving fast and keeping your momentum**. The player can:
 
 - **Walk, sprint and charge-jump** on the ground (`PlayerMovement`).
