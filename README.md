@@ -3,6 +3,9 @@
 A game inspired by the traversal mechanics of Spider-man. The player has various abilities at his disposal, such as web swinging, web zipping, wall running, diving and more. 
 The game is trial based, meaning there are multiple time trials where your goal is to complete the course in the fastest time possible. Upon completion, you will get a medal.
 
+## Gameplay Showcase Video
+Gameplay showcase youtube link: [Video link](https://youtu.be/rpumewPLAHc)
+
 ## Controls
  - **W, A, S, D** - Movement, while on the ground, in the air and during a swing
  - Walking up to a wall holding a movement key will trigger a wall crawl
