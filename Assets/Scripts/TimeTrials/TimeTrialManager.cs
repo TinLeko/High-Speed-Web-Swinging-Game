@@ -10,6 +10,13 @@ public enum TrialMedal {
     Gold = 3 
 }
 
+/// <summary>
+/// Runs the time trials. One is in the scene; it finds the player, and builds the UI and
+/// by itself. TimeTrialStarter objects in the world talk to it.
+/// Flow:  touch a starter -> prompt (yes/no) -> countdown -> race (fly through hoops in order)
+///        -> results (time, top speed, medal, best time).
+/// Hoop passing is a swept plane test, so it works at any speed (no tunneling through thin triggers).
+/// </summary>
 public class TimeTrialManager : MonoBehaviour
 {
     public static TimeTrialManager Instance { get; private set; }
@@ -185,6 +192,7 @@ public class TimeTrialManager : MonoBehaviour
             return;
         }
 
+        // Top speed: full 3D speed, sampled every physics step.
         topSpeed = Mathf.Max(topSpeed, playerRb.linearVelocity.magnitude);
 
         Vector3 current = playerRb.position;
@@ -423,7 +431,7 @@ public class TimeTrialManager : MonoBehaviour
         PlayerTeleported?.Invoke(playerRb.transform, delta);
     }
 
-    // hoops
+    // Hoops
 
     private void BuildHoops(TimeTrialStarter starter)
     {
@@ -446,6 +454,7 @@ public class TimeTrialManager : MonoBehaviour
 
     private void ClearHoops()
     {
+        // Hoops that are already fading out remove themselves.
         foreach (RaceHoopVisual visual in hoopVisuals)
         {
             if (visual != null && visual.StateNow != RaceHoopVisual.VisualState.Collected)
@@ -525,6 +534,8 @@ public class TimeTrialManager : MonoBehaviour
         return bestLine + "\n" + "Gold " + FormatTime(starter.goldTime) + "     Silver " + FormatTime(starter.silverTime) + "     Bronze " + FormatTime(starter.bronzeTime) + "\n" + string.Join("     ", rules) + "\n\n" +
                "Start the race?\n" + "[" + confirmKey + "] Yes          [" + cancelKey + "] No";
     }
+
+    // Helpers
 
     public static string BestTimeKey(string trialId) => "TimeTrial_BestTime_" + trialId;
     public static string BestMedalKey(string trialId) => "TimeTrial_BestMedal_" + trialId;

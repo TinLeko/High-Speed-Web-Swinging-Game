@@ -1,6 +1,9 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+/// <summary>
+/// Computes the camera-relative "orientation" and turns the player model.
+/// </summary>
 public class PlayerCamera : MonoBehaviour
 {
     public InputActionAsset inputActions;
@@ -48,7 +51,7 @@ public class PlayerCamera : MonoBehaviour
             Vector3 face;
             if (wallRun.Mode == Wallrun.WallMode.Running)
             {
-                face = wallRun.RunDirection;
+                face = wallRun.RunDirection; // face along the wall
             }
             else
             {

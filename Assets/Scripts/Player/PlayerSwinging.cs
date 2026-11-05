@@ -1,7 +1,16 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
 
+/// <summary>
+/// This is the heart of the game and the largest script. It does five jobs:
+///    1. Finding a web anchor with a forgiving, scored search.
+///    2. Swinging on a `SpringJoint`, with reeling, extra gravity and steering.
+///    3. Releasing the web, with a small reward for a plain release and a large reward for a well-timed swing jump.
+///    4. Post-release flight: steering, extra gravity, drag, one air jump.
+///    5. Diving, whose fall speed is converted into swing speed.
+/// </summary>
 public class PlayerSwinging : MonoBehaviour
 {
     public InputActionAsset inputActions;
@@ -22,6 +31,7 @@ public class PlayerSwinging : MonoBehaviour
     public float minAnchorHeight = 5f;
     public float anchorSphereRadius = 1.5f;
     public float[] pitchAngles = { 55f, 45f, 65f, 35f, 75f };
+    [Tooltip("Yaw offsets from camera forward. Positive = the side we're swinging toward.")]
     public float[] yawOffsets = { 20f, 0f, 40f, -20f, -40f, 70f, -70f };
     public float idealYaw = 20f;
     public float idealPitch = 55f;
@@ -34,7 +44,7 @@ public class PlayerSwinging : MonoBehaviour
     public float damper = 6f;
     public float reelSpeed = 3f;
     public float minRopeLength = 8f;
-    public float ropeShootSpeed = 200f;
+    public float ropeShootSpeed = 200f; // visual only
 
     [Header("Swing Feel")]
     public float extraGravity = 15f;
@@ -51,53 +61,69 @@ public class PlayerSwinging : MonoBehaviour
     public int maxComboLevel = 6;
     public float comboWindow = 1.5f;
     public float maxPowerMultiplier = 1.5f;
+    [Tooltip("A jump or release can briefly exceed the cap by this factor. Drag brings it back down.")]
     public float burstMultiplier = 1.25f;
 
     [Header("Plain Release (minor reward)")]
     public float minGoodSwingTime = 0.5f;
     public float minRisingSpeed = 2f;
     [Range(0.3f, 1f)] public float goodReleaseSpeedRatio = 0.7f;
-    [Tooltip("Ccombo levels gained by a well-timed plain release.")]
+    [Tooltip("Combo levels gained by a well-timed plain release.")]
     public float releaseComboGain = 0.25f;
     public float releaseSpeedBoost = 1.5f;
 
     [Header("Swing Jump (major reward)")]
+    [Tooltip("Best launch angle above horizontal, i.e. how steeply you're rising when you jump.")]
     public float idealJumpAngle = 35f;
-    [Tooltip("Strictness")]
+    [Tooltip("Half-width of the timing window in degrees. Smaller = stricter.")]
     public float jumpAngleWindow = 30f;
+    [Tooltip("Below this fraction of the speed cap, the jump earns nothing.")]
     [Range(0f, 1f)] public float minJumpSpeedRatio = 0.5f;
+    [Tooltip("At or above this fraction of the speed cap, speed counts fully.")]
     [Range(0f, 1f)] public float fullJumpSpeedRatio = 0.9f;
     [Range(0f, 1f)] public float minJumpTiming = 0.3f;
+    [Tooltip("Combo levels gained by a perfect jump (scaled by timing).")]
     public float jumpComboGain = 1f;
+    [Tooltip("Extra speed (m/s) along your velocity on a perfect jump (scaled by timing).")]
     public float jumpSpeedBoost = 12f;
     public float jumpSpeedBoostUp = 3f;
     public float jumpUpImpulse = 35f;
+    [Tooltip("How much a perfect jump reduces air drag, fading out over Drag Relief Time.")]
     [Range(0f, 1f)] public float jumpDragRelief = 0.7f;
     public float dragReliefTime = 1.5f;
     public bool debugLogTiming = false;
 
     [Header("After Release: Flight")]
-    [Tooltip("extra goes into forward speed instead")]
+    [Tooltip("Upward speed is capped at this on release. Extra goes into forward speed instead.")]
     public float maxLaunchUpSpeed = 10f;
+    [Tooltip("Extra downward acceleration for the whole flight.")]
     public float postReleaseGravity = 10f;
+    [Tooltip("More downward acceleration once you're falling.")]
     public float fallGravity = 12f;
 
     [Header("After Release: Air Jump")]
+    [Tooltip("Jumps allowed in the air after each web release. Refills on every release.")]
     public int maxAirJumps = 1;
+    [Tooltip("Upward speed of the air jump. If you're already rising faster, that is kept.")]
     public float airJumpUpSpeed = 11f;
+    [Tooltip("Fraction of horizontal speed kept when you air jump. 0.85 = lose 15%.")]
     [Range(0.3f, 1f)] public float airJumpMomentumKeep = 0.85f;
 
     [Header("Dive")]
+    [Tooltip("Downward speed you snap to when a dive starts.")]
     public float diveStartDownSpeed = 10f;
     public float diveAcceleration = 45f;
     public float maxDiveSpeed = 70f;
-    [Tooltip("Ddives shorter than this give no swing bonus")]
+    [Tooltip("Dives shorter than this give no swing bonus.")]
     public float minDiveTime = 0.3f;
-    [Tooltip("Dives this long give full swing bonus")]
+    [Tooltip("Dives this long (or longer) give the full swing bonus.")]
     public float fullDiveTime = 1.2f;
+    [Tooltip("You can let go of dive and still get the bonus if you swing within this time.")]
     public float diveCarryTime = 0.5f;
+    [Tooltip("How much of your fall speed becomes swing speed (at a full-length dive).")]
     [Range(0f, 1.5f)] public float diveSwingConversion = 0.9f;
     public float maxDiveSwingSpeed = 90f;
+    [Tooltip("The raised speed cap from a dive-swing fades back to normal at this rate (m/s per second).")]
     public float diveCapDecay = 12f;
 
     [Header("After Release: Air Control & Drag")]
@@ -107,6 +133,7 @@ public class PlayerSwinging : MonoBehaviour
     public float airDrag = 0.3f;
     public float airDragQuadratic = 0.025f;
 
+    // Read these from other scripts (camera, UI, etc.)
     public int ComboLevel => Mathf.FloorToInt(comboLevel);
     public float ComboT => maxComboLevel > 0 ? comboLevel / maxComboLevel : 0f;
     public float CurrentMaxSpeed => Mathf.Lerp(baseMaxSpeed, topMaxSpeed, ComboT);
@@ -171,11 +198,12 @@ public class PlayerSwinging : MonoBehaviour
 
     private void Update()
     {
+        // Jumping during a swing cuts the web and launches you.
         if (jumpAction != null && jumpAction.WasPressedThisFrame())
         {
             if (joint != null)
             {
-                wantsSwing = false;
+                wantsSwing = false; // press swing again to re-attach
                 ReleaseWeb(true);
                 return;
             }
@@ -248,6 +276,8 @@ public class PlayerSwinging : MonoBehaviour
         DrawRope();
     }
 
+    // Swing
+
     private void StartSwing()
     {
         if (Zipping) return;
@@ -286,6 +316,10 @@ public class PlayerSwinging : MonoBehaviour
         canSwing = true;
     }
 
+    /// <summary>
+    /// Cuts the web. A plain release only gives a small reward. A jump gives a large one,
+    /// scaled by how well it was timed.
+    /// </summary>
     private void ReleaseWeb(bool jumped)
     {
         if (joint == null) return;
@@ -340,6 +374,11 @@ public class PlayerSwinging : MonoBehaviour
         airJumpsUsed = 0;
     }
 
+    /// <summary>
+    /// 0..1 timing score. Best when you're moving fast and rising at about idealJumpAngle,
+    /// which is just after the bottom of the arc.
+    /// </summary>
+
     private float EvaluateJumpTiming(Vector3 velocity)
     {
         float speed = velocity.magnitude;
@@ -358,6 +397,11 @@ public class PlayerSwinging : MonoBehaviour
 
         return timing;
     }
+
+    /// <summary>
+    /// Caps upward speed but keeps total speed: whatever is cut from the vertical part
+    /// is moved into horizontal speed. Stops the "rocket straight up" launch.
+    /// </summary>
 
     private Vector3 LimitUpwardVelocity(Vector3 velocity)
     {
@@ -387,6 +431,11 @@ public class PlayerSwinging : MonoBehaviour
             && airJumpsUsed < maxAirJumps
             && !playerMovement.jumpConsumed;
     }
+
+    /// <summary>
+    /// Mid-air hop after a web release. Gives upward speed, but costs some horizontal momentum.
+    /// </summary>
+
     private void AirJump()
     {
         airJumpsUsed++;
@@ -472,6 +521,8 @@ public class PlayerSwinging : MonoBehaviour
         if (rb.linearVelocity.magnitude > cap)
             rb.linearVelocity = rb.linearVelocity.normalized * cap;
     }
+
+    // Flight after release
 
     public void ApplyAirGravity()
     {
@@ -567,7 +618,7 @@ public class PlayerSwinging : MonoBehaviour
         isDiving = true;
         diveStartTime = Time.time;
 
-        // cancel any upward motion
+        // Cancel any upward motion and snap into a downward dive.
         Vector3 velocity = rb.linearVelocity;
         rb.linearVelocity = new Vector3(velocity.x, Mathf.Min(velocity.y, -diveStartDownSpeed), velocity.z);
     }
@@ -588,6 +639,7 @@ public class PlayerSwinging : MonoBehaviour
             rb.linearVelocity = new Vector3(velocity.x, -maxDiveSpeed, velocity.z);
     }
 
+    /// <param name="keepCarry">If true, a swing started shortly after still gets the dive bonus.</param>
     private void EndDive(bool keepCarry)
     {
         if (isDiving)
@@ -598,6 +650,11 @@ public class PlayerSwinging : MonoBehaviour
         lastDiveTime = keepCarry ? Time.time : -999f;
     }
 
+    /// <summary>
+    /// Called when a web attaches. If you were diving (or just stopped), the speed you were
+    /// falling away from the anchor is turned into swing speed along the arc instead of being
+    /// absorbed by the rope. Longer dives convert more.
+    /// </summary>
     private void ApplyDiveConversion()
     {
         if (!isDiving && Time.time - lastDiveTime > diveCarryTime) return;
@@ -619,7 +676,7 @@ public class PlayerSwinging : MonoBehaviour
             ? flat.normalized
             : Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
 
-        // Direction of the arc
+        // Direction of the arc: forward and down, perpendicular to the rope.
         Vector3 tangent = Vector3.ProjectOnPlane(forward, ropeDir);
         if (tangent.sqrMagnitude < 0.001f) return;
         tangent.Normalize();
@@ -629,7 +686,7 @@ public class PlayerSwinging : MonoBehaviour
         newVelocity = Vector3.ClampMagnitude(newVelocity, maxDiveSwingSpeed);
 
         rb.linearVelocity = newVelocity;
-        swingSpeedCap = Mathf.Max(CurrentMaxSpeed, newVelocity.magnitude);
+        swingSpeedCap = Mathf.Max(CurrentMaxSpeed, newVelocity.magnitude); // let the boost exist, then decay
     }
 
     public void CancelSwingForZip()

@@ -1,6 +1,12 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+/// <summary>
+/// This is the baseline controller. It handles everything that is not a special ability: 
+/// walking, sprinting, a charge-up jump, slopes, ground friction and air movement. 
+/// When another system takes over (`swingMomentum == true`) it does nothing.
+/// </summary>
+
 public class PlayerMovement : MonoBehaviour
 {
     [Header("Movement")]
@@ -54,8 +60,8 @@ public class PlayerMovement : MonoBehaviour
 
     [Header("Landing Momentum")]
     [Range(0f, 1f)] public float landingSpeedKeep = 0.8f; // horizontal speed kept at touchdown
-    public float carryDuration = 1.5f; // seconds until normal ground rules return
-    [Range(0f, 1f)] public float carryDragRatio = 0.1f; // starting drag as a fraction of groundDrag
+    public float carryDuration = 1.5f;                    // seconds until normal ground rules return
+    [Range(0f, 1f)] public float carryDragRatio = 0.1f;   // starting drag as a fraction of groundDrag
     private float carryTimer;
     private float carryCap;
     public float CarrySpeed => carryCap;
@@ -108,6 +114,7 @@ public class PlayerMovement : MonoBehaviour
 
     private void MovePlayer()
     {
+        // PlayerSwinging owns all movement while swinging and right after release.
         if (swingMomentum)
             return;
 
@@ -158,6 +165,7 @@ public class PlayerMovement : MonoBehaviour
 
         SpeedControl();
 
+        // Ground drag would eat awaz speed if you release a swing close to the ground.
         if (carryTimer > 0f) carryTimer -= Time.deltaTime;
 
         if (grounded && !swingMomentum)
@@ -174,6 +182,7 @@ public class PlayerMovement : MonoBehaviour
 
     private void SpeedControl()
     {
+        // Don't cap speed while swinging, beacuse PlayerSwinging has its own maxSpeed.
         if (swingMomentum)
             return;
 
@@ -192,6 +201,7 @@ public class PlayerMovement : MonoBehaviour
             if (flatVelocity.magnitude > cap)
             {
                 Vector3 limited = flatVelocity.normalized * cap;
+                // Keeping the vertical velocity. Overwriting it with a flat vector kills jumps and falls.
                 rb.linearVelocity = new Vector3(limited.x, rb.linearVelocity.y, limited.z);
             }
         }
@@ -278,7 +288,7 @@ public class PlayerMovement : MonoBehaviour
     private float CurrentGroundDrag()
     {
         if (carryTimer <= 0f) return groundDrag;
-        float t = 1f - carryTimer / carryDuration;
+        float t = 1f - carryTimer / carryDuration; // 0 at landing, 1 when the carry ends
         return Mathf.Lerp(groundDrag * carryDragRatio, groundDrag, t * t);
     }
 

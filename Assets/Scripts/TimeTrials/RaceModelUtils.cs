@@ -1,5 +1,8 @@
 using UnityEngine;
 
+/// <summary>
+/// Small helpers for working with hoop, arrow and marker models.
+/// </summary>
 public static class RaceModelUtils
 {
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");

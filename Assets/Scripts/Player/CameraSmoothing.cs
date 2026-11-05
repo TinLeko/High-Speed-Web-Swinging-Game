@@ -1,6 +1,10 @@
 using Unity.Cinemachine;
 using UnityEngine;
 
+/// <summary>
+/// The faster you go, the wider the view and the farther the camera sits, with a frame-rate-independent ease.
+/// </summary>
+
 public class CameraSmoothing : MonoBehaviour
 {
     [SerializeField]

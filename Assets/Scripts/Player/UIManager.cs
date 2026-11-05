@@ -2,6 +2,9 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 
+/// <summary>
+/// Contains a simple speed readout and a speed-lines particle effect.
+/// </summary>
 public class UIManager : MonoBehaviour
 {
     [Header("References")]
@@ -12,9 +15,9 @@ public class UIManager : MonoBehaviour
     [Header("Settings")]
     public float speedMultiplier = 3.6f;
     public string speedUnit = "km/h";
-    public float minSpeedToShowLines = 15f;
+    public float minSpeedToShowLines = 15f; // speed required to start seeing lines
     public float maxSpeed = 30f; // speed at which lines are at maximum density
-    public float maxEmissionRate = 150f;
+    public float maxEmissionRate = 150f; // max number of particles
 
     private ParticleSystem.EmissionModule emissionModule;
 
@@ -34,8 +37,10 @@ public class UIManager : MonoBehaviour
         horizontalVelocity = new Vector3(playerRb.linearVelocity.x, 0f, playerRb.linearVelocity.z);
         float currentSpeed = horizontalVelocity.magnitude;
 
+        // Calculate a percentage between min and max speed (0.0 to 1.0)
         float speedPercentage = Mathf.InverseLerp(minSpeedToShowLines, maxSpeed, currentSpeed);
 
+        // Apply that percentage to the maximum emission rate
         emissionModule.rateOverTime = speedPercentage * maxEmissionRate;
 
         if (speedText != null)

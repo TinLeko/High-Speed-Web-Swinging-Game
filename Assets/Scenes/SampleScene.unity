@@ -87685,8 +87685,6 @@ MonoBehaviour:
   minSpeedToShowLines: 15
   maxSpeed: 30
   maxEmissionRate: 150
-  normalColor: {r: 1, g: 1, b: 1, a: 1}
-  maxSpeedColor: {r: 1, g: 0, b: 0, a: 1}
 --- !u!43 &371593564
 Mesh:
   m_ObjectHideFlags: 0
@@ -247119,7 +247117,6 @@ MonoBehaviour:
   passPadding: 0.6
   hoopPrefab: {fileID: 4012796991739381397, guid: cdf3bcc191fa61a41862736e9e5ecab7, type: 3}
   hoopPrefabRadius: 0
-  tintHoopModel: 1
   customTintProperty: 
   arrowPrefab: {fileID: 474014130876513265, guid: 07e0267c33930a943967e990155985cd, type: 3}
   arrowScale: 0.7
@@ -356927,7 +356924,6 @@ MonoBehaviour:
   markerHeight: 0.4
   markerSpinSpeed: 70
   markerBobAmount: 0.2
-  tintCustomMarker: 1
 --- !u!135 &1437941511
 SphereCollider:
   m_ObjectHideFlags: 0
@@ -428523,8 +428519,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d59627a4c7ab0bf48af55b3899e7bd20, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CameraSmoothing
-  camera: {fileID: 0}
-  orbitalFollow: {fileID: 0}
+  camera: {fileID: 1680723181}
+  orbitalFollow: {fileID: 1680723180}
   target: {fileID: 1963176765}
   maxSpeed: 48
   minFov: 70
@@ -504055,8 +504051,6 @@ MonoBehaviour:
   crawlSpeed: 9
   crawlAttachDistance: 0.7
   crawlApproachDot: 0.5
-  allowCrawlFromAir: 1
-  followCorners: 1
   cornerReach: 2
   cornerSteerAcceleration: 1500
   cornerSteerTime: 0.25

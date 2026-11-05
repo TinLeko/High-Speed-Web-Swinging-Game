@@ -1,14 +1,16 @@
 using UnityEngine;
 
-/// Preview   = the hoop after the next one (smaller)
-/// Active    = the hoop to fly through (pulsing)
-/// Collected = quick swell and shrink, then it removes itself
+/// <summary>
+/// The look of one objective hoop. Created by TimeTrialManager
+///   Preview   = the hoop after the next one, faint
+///   Active    = the hoop to fly through, bright and pulsing, with a tall beam so it is visible from far away
+///   Collected = quick expanding fade, then it removes itself
+/// </summary>
 public class RaceHoopVisual : MonoBehaviour
 {
     public enum VisualState { Hidden, Preview, Active, Collected }
     public VisualState StateNow { get; private set; } = VisualState.Hidden;
 
-    // Only used when tint hoop model is on
     private static readonly Color ActiveTint = new Color(0.4f, 0.95f, 1f, 1f);
     private static readonly Color PreviewTint = new Color(0.55f, 0.55f, 0.55f, 1f);
     private static readonly Color PassedTint = new Color(0.4f, 1f, 0.4f, 1f);

@@ -1,6 +1,12 @@
 using Unity.Cinemachine;
 using UnityEngine;
 
+/// <summary>
+/// Camera effects for a Cinemachine 3 Orbital Follow camera. Put on any object in the scene.
+///  - Turns the camera with wall-run corners and swings it around when you jump off a wall
+///    (WallRun.ConsumeYawDelta supplies both).
+///  - Tilts the view down while diving, and up while running straight up a wall.
+/// </summary>
 public class CameraEffects : MonoBehaviour
 {
     [Header("References")]
@@ -10,6 +16,7 @@ public class CameraEffects : MonoBehaviour
 
     [Header("Direction")]
     public float yawDirection = 1f;
+    [Tooltip("+1 means a larger Vertical Axis value tilts the view down. -1 tilts it up instead.")]
     public float pitchDirection = 1f;
 
     [Header("Tilt")]
@@ -47,6 +54,7 @@ public class CameraEffects : MonoBehaviour
         if (wallRun != null && wallRun.IsActive && wallRun.Mode == Wallrun.WallMode.Climbing)
             targetPitch -= climbTiltUp;
 
+        // Apply the change in tilt each frame, so mouse look keeps working and nothing is overwritten.
         float newOffset = Mathf.Lerp(pitchOffset, targetPitch, 1f - Mathf.Exp(-tiltSharpness * dt));
         float pitchDelta = (newOffset - pitchOffset) * pitchDirection;
         pitchOffset = newOffset;

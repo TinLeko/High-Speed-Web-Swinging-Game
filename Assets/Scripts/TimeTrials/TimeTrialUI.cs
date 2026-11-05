@@ -1,6 +1,10 @@
 using UnityEngine;
 using UnityEngine.UI;
 
+/// <summary>
+/// Builds the whole time trial UI in code (prompt, HUD, countdown, results), so there is nothing to set up.
+/// TimeTrialManager creates this automatically. Uses the legacy UI Text and Unity's built-in font.
+/// </summary>
 public class TimeTrialUI : MonoBehaviour
 {
     private Font font;
@@ -79,6 +83,7 @@ public class TimeTrialUI : MonoBehaviour
         toastHideTime = Time.unscaledTime + seconds;
     }
 
+    /// <summary> Used for 3, 2, 1. </summary>
     public void ShowCountdown(string text)
     {
         countdownText.text = text;
@@ -86,6 +91,7 @@ public class TimeTrialUI : MonoBehaviour
         countdownHideTime = -1f;
     }
 
+    /// <summary>Shows a big message and hides it by itself (used for GO!).</summary>
     public void FlashMessage(string text, float seconds)
     {
         countdownText.text = text;
@@ -141,6 +147,8 @@ public class TimeTrialUI : MonoBehaviour
         toastText.gameObject.SetActive(false);
         HideCountdown();
     }
+
+    // Building
 
     private void Build()
     {

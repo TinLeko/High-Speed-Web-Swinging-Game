@@ -1,6 +1,10 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+/// <summary>
+/// Web Zip: fires a web at whatever the cursor / crosshair points at, yanks the player toward it,
+/// and launches them out the other end with a burst of speed.
+/// </summary>
 public class WebZip : MonoBehaviour
 {
     [Header("References")]
@@ -12,22 +16,28 @@ public class WebZip : MonoBehaviour
     [Header("Aiming")]
     public float maxZipDistance = 70f;
     public float minZipDistance = 6f;
+    [Tooltip("If the exact cursor ray misses, a fat ray of this radius is tried (aim assist).")]
     public float aimAssistRadius = 0.6f;
 
     [Header("Zip")]
+    [Tooltip("Minimum speed toward the target the instant the zip fires: the 'snap'.")]
     public float zipStartSpeed = 45f;
     public float zipTopSpeed = 90f;
+    [Tooltip("How fast the pull speed ramps up (m/s per second).")]
     public float zipAcceleration = 250f;
+    [Tooltip("How hard velocity is bent toward the target (m/s per second). Lower = keeps more old momentum.")]
     public float steerAcceleration = 600f;
     public float arriveDistance = 3f;
     public float maxZipTime = 1.5f;
     public float cooldown = 0.6f;
-    public float ropeShootSpeed = 300f;
+    public float ropeShootSpeed = 300f; // visual only
     public float consecutiveZips = 1f;
 
     [Header("Exit")]
+    [Tooltip("Extra speed added when the zip completes: the 'quick impulse'.")]
     public float exitSpeedBonus = 12f;
     public float maxExitSpeed = 100f;
+    [Tooltip("Tilts the exit direction upward so you pop over ledges.")]
     [Range(0f, 0.5f)] public float exitUpBias = 0.15f;
     public float comboGain = 0.5f;
     [Range(0f, 1f)] public float dragRelief = 1f;
@@ -107,9 +117,11 @@ public class WebZip : MonoBehaviour
         Vector3 dir = toTarget / dist;
         zipSpeed = Mathf.Min(zipSpeed + zipAcceleration * Time.fixedDeltaTime, zipTopSpeed);
 
+        // Bend velocity toward the target rather than replacing it, so the pull has weight.
         rb.linearVelocity = Vector3.MoveTowards(
             rb.linearVelocity, dir * zipSpeed, steerAcceleration * Time.fixedDeltaTime);
 
+        // PlayerMovement re-enables gravity every frame while swingMomentum is set, so cancelling it here.
         rb.AddForce(-Physics.gravity, ForceMode.Acceleration);
     }
 
@@ -124,6 +136,7 @@ public class WebZip : MonoBehaviour
 
     private void OnCollisionEnter(Collision collision)
     {
+        // Something solid is in the way: stop pulling, keep the speed, no reward.
         if (IsZipping && Time.time - zipStartTime > 0.1f)
             FinishZip();
     }
@@ -136,7 +149,7 @@ public class WebZip : MonoBehaviour
         nextZipTime = Time.time + cooldown;
     }
 
-    // aiming
+    // Aiming
 
     private Ray GetAimRay()
     {
@@ -152,6 +165,8 @@ public class WebZip : MonoBehaviour
         point = Vector3.zero;
         Ray ray = GetAimRay();
 
+        // Third-person cameras sit behind the player. Start the ray level with the player so
+        // walls between the camera and the player can't be picked as targets.
         float skip = Mathf.Max(0f, Vector3.Dot(transform.position - ray.origin, ray.direction));
         Vector3 origin = ray.origin + ray.direction * skip;
 
@@ -159,6 +174,7 @@ public class WebZip : MonoBehaviour
         bool found = Physics.Raycast(origin, ray.direction, out hit, maxZipDistance, zippable, QueryTriggerInteraction.Ignore) ||
             Physics.SphereCast(origin, aimAssistRadius, ray.direction, out hit, maxZipDistance, zippable, QueryTriggerInteraction.Ignore);
 
+        // distance 0 means the sphere started inside a collider and hit.point is meaningless.
         if (!found || hit.distance <= 0f) return false;
         if (Vector3.Distance(transform.position, hit.point) < minZipDistance) return false;
 

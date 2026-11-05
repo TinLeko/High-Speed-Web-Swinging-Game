@@ -1,5 +1,8 @@
 using UnityEngine;
 
+/// <summary>
+/// The item in the world that starts a time trial. Touch it to get the "start the race?" prompt.
+/// </summary>
 public class TimeTrialStarter : MonoBehaviour
 {
     [Header("Trial")]
@@ -8,7 +11,7 @@ public class TimeTrialStarter : MonoBehaviour
     public string trialName = "Rooftop Run";
 
     [Header("Course")]
-    [Tooltip("empty transforms")]
+    [Tooltip("Empty transforms, in the order they must be flown through. Each point's blue (forward) arrow is the direction through the hoop. Scale a point to make that hoop bigger or smaller.")]
     public Transform[] hoopPoints;
     public float hoopRadius = 6f;
 
@@ -105,6 +108,7 @@ public class TimeTrialStarter : MonoBehaviour
             TimeTrialManager.Instance.OnPlayerLeftStarter(this);
     }
 
+    // Marker
     private void BuildMarker()
     {
         var markerObject = new GameObject("TrialMarker");
@@ -120,6 +124,7 @@ public class TimeTrialStarter : MonoBehaviour
         RefreshMarker();
     }
 
+    /// <summary>The marker is a set color until you earn a medal here, then it takes the colour of your best one.</summary>
     public void RefreshMarker()
     {
         if (markerRenderers == null) return;
@@ -137,6 +142,7 @@ public class TimeTrialStarter : MonoBehaviour
         marker.localPosition = Vector3.up * (markerHeight + Mathf.Sin(Time.time * 2f) * markerBobAmount);
     }
 
+    // Editor preview
 
     private void OnDrawGizmos()
     {

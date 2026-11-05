@@ -46,7 +46,7 @@ Gameplay showcase youtube link: [Video link](https://youtu.be/rpumewPLAHc)
 8. [WebZip](#8-webzip)
 9. [WallRun](#9-wallrun)
 10. [Camera scripts](#10-camera-scripts)
-11. [SpeedometerUI](#11-speedometerui)
+11. [UIManager](#11-UIManager)
 12. [The time trial system](#12-the-time-trial-system)
 13. [End-to-end walkthroughs](#13-end-to-end-walkthroughs)
 14. [Tuning guide](#14-tuning-guide)
@@ -992,9 +992,9 @@ The faster you go, the wider the view and the farther the camera sits, with a fr
 
 ---
 
-## 11. SpeedometerUI
+## 11. UIManager
 
-**File:** `UIManager.cs` (class `SpeedometerUI`) | **Lives on:** a UI object.
+**File:** `UIManager.cs` (class `UIManager`) | **Lives on:** a UI object.
 
 A simple speed readout and a speed-lines particle effect.
 

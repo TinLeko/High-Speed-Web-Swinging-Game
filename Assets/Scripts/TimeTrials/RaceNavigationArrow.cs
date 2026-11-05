@@ -1,5 +1,10 @@
 using UnityEngine;
 
+/// <summary>
+/// Floats above the player and points arrow model at the next hoop (including up and down).
+/// Created by TimeTrialManager, which calls Setup. If no arrow prefab is assigned, nothing is shown.
+/// Model must point along +Z.
+/// </summary>
 public class RaceNavigationArrow : MonoBehaviour
 {
     public Transform follow;
