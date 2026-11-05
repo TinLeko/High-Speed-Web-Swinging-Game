@@ -29,21 +29,31 @@ public class CameraEffects : MonoBehaviour
 
     private float pitchOffset; // degrees currently applied, positive = down, ngeative = up
 
+    /// <summary>Unity message. Subscribes to <c>TimeTrialManager.PlayerTeleported</c> so the camera follows teleports without a visible swoosh.</summary>
     private void OnEnable()
     {
         TimeTrialManager.PlayerTeleported += OnPlayerTeleported;
     }
 
+    /// <summary>Unity message. Unsubscribes from <c>TimeTrialManager.PlayerTeleported</c>.</summary>
     private void OnDisable()
     {
         TimeTrialManager.PlayerTeleported -= OnPlayerTeleported;
     }
 
+    /// <summary>Event handler. Tells Cinemachine the follow target was warped so it moves the camera by the same offset instead of interpolating.</summary>
+    /// <param name="target">The transform that was teleported.</param>
+    /// <param name="delta">The world-space displacement of the teleport.</param>
     private void OnPlayerTeleported(Transform target, Vector3 delta)
     {
         CinemachineCore.OnTargetObjectWarped(target, delta);
     }
 
+    /// <summary>
+    /// Unity message. Eases a pitch offset toward the target tilt (dive tilts down, climb optionally tilts up), then applies this frame's
+    /// change in tilt to the orbital Vertical Axis and the wall-run yaw delta to the Horizontal Axis. The horizontal axis wraps around its
+    /// range; the vertical axis is clamped to it.
+    /// </summary>
     private void Update()
     {
         float dt = Time.deltaTime;

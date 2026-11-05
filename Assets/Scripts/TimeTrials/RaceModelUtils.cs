@@ -1,19 +1,29 @@
 using UnityEngine;
 
 /// <summary>
-/// Small helpers for working with hoop, arrow and marker models.
+/// mall helpers for working with hoop, arrow and marker models.
 /// </summary>
 public static class RaceModelUtils
 {
     private static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
     private static readonly int ColorId = Shader.PropertyToID("_Color");
 
+    /// <summary>
+    /// Destroys every collider on an object and its children (including inactive ones), so decorative models cannot block the player.
+    /// </summary>
+    /// <param name="root">The model root.</param>
     public static void StripColliders(GameObject root)
     {
         foreach (Collider collider in root.GetComponentsInChildren<Collider>(true))
             UnityEngine.Object.Destroy(collider);
     }
 
+    /// <summary>
+    /// Measures the opening radius of a model: the larger of the half-width and half-height of the combined mesh bounds, in the local space of
+    /// <paramref name="root"/>. Expects a ring facing along the local Z axis.
+    /// </summary>
+    /// <param name="root">The transform to measure under.</param>
+    /// <returns>The radius, or 1 if there are no meshes.</returns>
     public static float MeasureRadius(Transform root)
     {
         bool any = false;
@@ -38,6 +48,13 @@ public static class RaceModelUtils
         return any ? Mathf.Max(bounds.extents.x, bounds.extents.y) : 1f;
     }
 
+    /// <summary>
+    /// Colours renderers using a <see cref="MaterialPropertyBlock"/> (materials are not duplicated). Sets <c>_BaseColor</c> and <c>_Color</c>,
+    /// so it works with both URP/HDRP and built-in shaders, plus an optional custom property.
+    /// </summary>
+    /// <param name="renderers">The renderers to tint; null entries are skipped.</param>
+    /// <param name="color">The colour.</param>
+    /// <param name="extraProperty">Name of an additional shader colour property, or empty.</param>
     public static void Tint(Renderer[] renderers, Color color, string extraProperty = "")
     {
         var block = new MaterialPropertyBlock();

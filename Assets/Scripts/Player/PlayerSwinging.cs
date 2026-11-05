@@ -4,13 +4,20 @@ using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
 
 /// <summary>
-/// This is the heart of the game and the largest script. It does five jobs:
-///    1. Finding a web anchor with a forgiving, scored search.
-///    2. Swinging on a `SpringJoint`, with reeling, extra gravity and steering.
-///    3. Releasing the web, with a small reward for a plain release and a large reward for a well-timed swing jump.
-///    4. Post-release flight: steering, extra gravity, drag, one air jump.
-///    5. Diving, whose fall speed is converted into swing speed.
+/// The core of the game and its largest script. It handles:
+/// <list type="number">
+/// <item><description>Finding a web anchor with a forgiving, scored search.</description></item>
+/// <item><description>Swinging on a <see cref="SpringJoint"/> with reeling, extra gravity and steering.</description></item>
+/// <item><description>Releasing the web: a small reward for a plain release, a large one for a well-timed swing jump.</description></item>
+/// <item><description>Post-release flight: steering, extra gravity, drag and one air jump.</description></item>
+/// <item><description>Diving, whose fall speed is converted into swing speed.</description></item>
+/// </list>
 /// </summary>
+/// <remarks>
+/// Also acts as the momentum hub for <see cref="WebZip"/> and <see cref="Wallrun"/>, which call <see cref="BeginZipMomentum"/> and
+/// <see cref="EndZip"/> to enter and leave scripted movement. Requires <see cref="Rigidbody"/>, <see cref="PlayerMovement"/> and
+/// <see cref="WebZip"/> on the same GameObject.
+/// </remarks>
 public class PlayerSwinging : MonoBehaviour
 {
     public InputActionAsset inputActions;
@@ -134,14 +141,31 @@ public class PlayerSwinging : MonoBehaviour
     public float airDragQuadratic = 0.025f;
 
     // Read these from other scripts (camera, UI, etc.)
+    /// <summary>The current combo level, rounded down.</summary>
     public int ComboLevel => Mathf.FloorToInt(comboLevel);
+
+    /// <summary>The combo level as a 0 to 1 fraction of <see cref="maxComboLevel"/>.</summary>
     public float ComboT => maxComboLevel > 0 ? comboLevel / maxComboLevel : 0f;
+
+    /// <summary>The speed cap from the combo alone, between <see cref="baseMaxSpeed"/> and <see cref="topMaxSpeed"/>.</summary>
     public float CurrentMaxSpeed => Mathf.Lerp(baseMaxSpeed, topMaxSpeed, ComboT);
+
+    /// <summary>The timing score (0 to 1) of the most recent swing jump.</summary>
     public float LastJumpTiming { get; private set; }
+
+    /// <summary>Air jumps still available since the last web release.</summary>
     public int AirJumpsRemaining => Mathf.Max(0, maxAirJumps - airJumpsUsed);
+
+    /// <summary>True while a dive is in progress.</summary>
     public bool IsDiving => isDiving;
+
+    /// <summary>The speed cap in use: the combo cap or a temporarily raised cap from a dive swing, boost or landing carry, whichever is higher.</summary>
     private float EffectiveMaxSpeed => Mathf.Max(CurrentMaxSpeed, swingSpeedCap);
+
+    /// <summary>The short-term speed limit for releases and jumps: <see cref="EffectiveMaxSpeed"/> times <see cref="burstMultiplier"/>.</summary>
     private float BurstMaxSpeed => EffectiveMaxSpeed * burstMultiplier;
+
+    /// <summary>Multiplier (1 to <see cref="maxPowerMultiplier"/>) that scales reeling, gravity and steering with the combo.</summary>
     private float Power => Mathf.Lerp(1f, maxPowerMultiplier, ComboT);
 
     private Rigidbody rb;
@@ -168,22 +192,31 @@ public class PlayerSwinging : MonoBehaviour
     private float swingSpeedCap;
 
     private WebZip zip;
+
+    /// <summary>True while a <see cref="WebZip"/> is in progress.</summary>
     private bool Zipping => zip != null && zip.IsZipping;
 
     private Wallrun wall;
+
+    /// <summary>True while a <see cref="Wallrun"/> is active.</summary>
     private bool OnWall => wall != null && wall.IsActive;
+
+    /// <summary>True while a zip or wall run owns the player's movement.</summary>
     private bool Busy => Zipping || OnWall;
 
+    /// <summary>Unity message. Enables the "Player" input action map.</summary>
     private void OnEnable()
     {
         inputActions.FindActionMap("Player").Enable();
     }
 
+    /// <summary>Unity message. Disables the "Player" input action map.</summary>
     private void OnDisable()
     {
         inputActions.FindActionMap("Player").Disable();
     }
 
+    /// <summary>Unity message. Looks up the input actions and caches sibling components.</summary>
     private void Awake()
     {
         swingAction = InputSystem.actions.FindAction("Swing");
@@ -196,6 +229,11 @@ public class PlayerSwinging : MonoBehaviour
         wall = GetComponent<Wallrun>();
     }
 
+    /// <summary>
+    /// Unity message. Handles input: jump during a swing cuts the web and launches (a swing jump); jump in the air after a release does the air jump;
+    /// the dive button starts a dive; the swing button sets or clears the wish to swing, releasing the web on button release. While a swing is wanted
+    /// but no web is attached, retries <see cref="StartSwing"/> every <see cref="retryInterval"/> seconds.
+    /// </summary>
     private void Update()
     {
         // Jumping during a swing cuts the web and launches you.
@@ -214,12 +252,12 @@ public class PlayerSwinging : MonoBehaviour
 
         if (DivePressedThisFrame && CanDive())
             StartDive();
-        if (swingAction.WasPressedThisFrame())
+        if (swingAction != null && swingAction.WasPressedThisFrame())
         {
             wantsSwing = true;
             nextRetryTime = 0f;
         }
-        if (swingAction.WasReleasedThisFrame())
+        if (swingAction != null && swingAction.WasReleasedThisFrame())
         {
             wantsSwing = false;
             ReleaseWeb(false);
@@ -232,6 +270,11 @@ public class PlayerSwinging : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Unity message. Decays the raised speed cap, then (unless a zip or wall run is active) runs swing physics while attached, or the dive,
+    /// post-release air control, air gravity and drag. Handles landing (which resets combo and carries momentum) and resets the combo after
+    /// <see cref="comboWindow"/> seconds without a release or dive.
+    /// </summary>
     private void FixedUpdate()
     {
         if (swingSpeedCap > CurrentMaxSpeed)
@@ -271,13 +314,18 @@ public class PlayerSwinging : MonoBehaviour
         }
     }
 
+    /// <summary>Unity message. Draws the rope after movement has been applied.</summary>
     private void LateUpdate()
     {
         DrawRope();
     }
 
-    // Swing
+    // -------------------------------------------------------------------------------------- Swing
 
+    /// <summary>
+    /// Tries to attach a web. Blocked while zipping, already swinging or on cooldown; cancels any wall run. If an anchor is found it creates a
+    /// <see cref="SpringJoint"/>, sets scripted-momentum flags, converts dive speed into swing speed, starts the rope visual and alternates the swing side.
+    /// </summary>
     private void StartSwing()
     {
         if (Zipping) return;
@@ -286,7 +334,9 @@ public class PlayerSwinging : MonoBehaviour
         if (OnWall) wall.Cancel();
         if (!TryFindSwingPoint(out swingPoint)) return;
 
-        zip.consecutiveZips = 0f;
+        if (zip != null)
+            zip.consecutiveZips = 0f;
+
         playerMovement.isSwinging = true;
         playerMovement.swingMomentum = true;
         airControlTimer = 0f;
@@ -311,15 +361,18 @@ public class PlayerSwinging : MonoBehaviour
         swingSide = -swingSide;
     }
 
+    /// <summary>Invoked after <see cref="swingCooldown"/>. Allows swinging again.</summary>
     private void ResetSwing()
     {
         canSwing = true;
     }
 
     /// <summary>
-    /// Cuts the web. A plain release only gives a small reward. A jump gives a large one,
-    /// scaled by how well it was timed.
+    /// Cuts the web. A plain release only gives a small reward when it is well timed (long enough swing, rising, fast enough). A swing jump gives a larger one
+    /// scaled by <see cref="EvaluateJumpTiming"/>: combo gain, speed boost, drag relief and an upward impulse. Limits upward launch speed, clamps to the burst
+    /// speed cap and starts the post-release flight with air control and a refilled air jump.
     /// </summary>
+    /// <param name="jumped"><c>true</c> if the release was triggered by a jump press.</param>
     private void ReleaseWeb(bool jumped)
     {
         if (joint == null) return;
@@ -375,10 +428,11 @@ public class PlayerSwinging : MonoBehaviour
     }
 
     /// <summary>
-    /// 0..1 timing score. Best when you're moving fast and rising at about idealJumpAngle,
-    /// which is just after the bottom of the arc.
+    /// Scores a swing jump from 0 to 1. The score is the product of how close the launch angle is to <see cref="idealJumpAngle"/>
+    /// (within <see cref="jumpAngleWindow"/>) and how close the speed is to the cap. Best just after the bottom of the arc while moving fast.
     /// </summary>
-
+    /// <param name="velocity">Velocity at the moment of release.</param>
+    /// <returns>The timing score, 0 (poor) to 1 (perfect).</returns>
     private float EvaluateJumpTiming(Vector3 velocity)
     {
         float speed = velocity.magnitude;
@@ -399,10 +453,11 @@ public class PlayerSwinging : MonoBehaviour
     }
 
     /// <summary>
-    /// Caps upward speed but keeps total speed: whatever is cut from the vertical part
-    /// is moved into horizontal speed. Stops the "rocket straight up" launch.
+    /// Caps upward speed at <see cref="maxLaunchUpSpeed"/> while keeping total speed: whatever is cut from the vertical part is moved into horizontal speed.
+    /// Stops "rocket straight up" launches.
     /// </summary>
-
+    /// <param name="velocity">The launch velocity.</param>
+    /// <returns>The adjusted velocity.</returns>
     private Vector3 LimitUpwardVelocity(Vector3 velocity)
     {
         if (velocity.y <= maxLaunchUpSpeed) return velocity;
@@ -417,12 +472,15 @@ public class PlayerSwinging : MonoBehaviour
         return dir * horizontal + Vector3.up * maxLaunchUpSpeed;
     }
 
+    /// <summary>Ends the post-release control phase and gives movement back to <see cref="PlayerMovement"/>.</summary>
     private void EndMomentum()
     {
         airControlTimer = 0f;
         playerMovement.swingMomentum = false;
     }
 
+    /// <summary>Checks whether an air jump is allowed: no web, airborne after a swing, jumps left, and the jump press not already consumed.</summary>
+    /// <returns><c>true</c> if an air jump can be performed.</returns>
     private bool CanAirJump()
     {
         return joint == null
@@ -433,9 +491,8 @@ public class PlayerSwinging : MonoBehaviour
     }
 
     /// <summary>
-    /// Mid-air hop after a web release. Gives upward speed, but costs some horizontal momentum.
+    /// Mid-air hop after a web release. Sets upward speed to at least <see cref="airJumpUpSpeed"/> at the cost of some horizontal momentum, and ends any dive.
     /// </summary>
-
     private void AirJump()
     {
         airJumpsUsed++;
@@ -453,6 +510,13 @@ public class PlayerSwinging : MonoBehaviour
         playerMovement.jumpConsumed = true;
     }
 
+    /// <summary>
+    /// Searches for a web anchor. It sphere-casts along many combinations of yaw (towards the swing side) and pitch from the camera heading, plus one wider cast along
+    /// the camera aim. Hits too close or too low are discarded; the rest are scored by distance from the ideal yaw, pitch and distance (the camera cast gets a bonus),
+    /// and the lowest score wins.
+    /// </summary>
+    /// <param name="point">The chosen anchor position, or <see cref="Vector3.zero"/> if none was found.</param>
+    /// <returns><c>true</c> if an anchor was found.</returns>
     private bool TryFindSwingPoint(out Vector3 point)
     {
         Vector3 forward = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up);
@@ -468,6 +532,12 @@ public class PlayerSwinging : MonoBehaviour
         Vector3 bestPoint = Vector3.zero;
         bool found = false;
 
+        /// <summary>Local function. Casts one candidate direction and keeps the hit if it is valid and scores better than the best so far.</summary>
+        /// <param name="dir">World direction to cast.</param>
+        /// <param name="radius">Sphere cast radius.</param>
+        /// <param name="yaw">Yaw of the candidate in degrees, used for scoring.</param>
+        /// <param name="pitch">Pitch of the candidate in degrees, used for scoring.</param>
+        /// <param name="bonus">Score reduction applied to preferred candidates.</param>
         void Consider(Vector3 dir, float radius, float yaw, float pitch, float bonus)
         {
             if (!Physics.SphereCast(origin, radius, dir, out RaycastHit hit, maxSwingDistance, grappable)) return;
@@ -505,6 +575,10 @@ public class PlayerSwinging : MonoBehaviour
         return found;
     }
 
+    /// <summary>
+    /// Per-physics-step swing update: shortens the rope (reeling), adds extra gravity, applies camera-relative steering and clamps speed to
+    /// <see cref="EffectiveMaxSpeed"/>. All scaled by the combo <see cref="Power"/>.
+    /// </summary>
     private void SwingPhysics()
     {
         float power = Power;
@@ -522,8 +596,9 @@ public class PlayerSwinging : MonoBehaviour
             rb.linearVelocity = rb.linearVelocity.normalized * cap;
     }
 
-    // Flight after release
+    // ---------------------------------------------------------------------------Flight after release
 
+    /// <summary>Adds extra downward acceleration during post-release flight (more once falling).</summary>
     public void ApplyAirGravity()
     {
         float extra = postReleaseGravity;
@@ -533,6 +608,10 @@ public class PlayerSwinging : MonoBehaviour
         rb.AddForce(Vector3.down * extra, ForceMode.Acceleration);
     }
 
+    /// <summary>
+    /// Steers the horizontal velocity toward the input direction during post-release flight, rotating at <see cref="steerDegreesPerSecond"/> and adding
+    /// <see cref="airAcceleration"/>. Speed is clamped to the burst cap.
+    /// </summary>
     private void AirControl()
     {
         Vector3 desired = GetCameraRelativeInput();
@@ -560,6 +639,9 @@ public class PlayerSwinging : MonoBehaviour
         rb.linearVelocity = new Vector3(horizontal.x, velocity.y, horizontal.z);
     }
 
+    /// <summary>
+    /// Applies horizontal air drag (constant plus speed-dependent). A well-timed swing jump reduces the drag, fading over <see cref="dragReliefTime"/>.
+    /// </summary>
     public void ApplyAirDrag()
     {
         Vector3 velocity = rb.linearVelocity;
@@ -577,8 +659,9 @@ public class PlayerSwinging : MonoBehaviour
         rb.linearVelocity = new Vector3(horizontal.x, velocity.y, horizontal.z);
     }
 
-    // Dive
+    // ------------------------------------------------------------------------------------ Dive
 
+    /// <summary>True on the frame the dive button was pressed (falls back to Left Ctrl if the action is missing).</summary>
     private bool DivePressedThisFrame
     {
         get
@@ -593,6 +676,8 @@ public class PlayerSwinging : MonoBehaviour
             }
         }
     }
+
+    /// <summary>True while the dive button is held (falls back to Left Ctrl if the action is missing).</summary>
     private bool DiveHeld
     {
         get
@@ -608,11 +693,14 @@ public class PlayerSwinging : MonoBehaviour
         }
     }
 
+    /// <summary>Checks whether a dive may start: airborne, not swinging, not already diving, and not zipping or wall-running.</summary>
+    /// <returns><c>true</c> if a dive can start.</returns>
     private bool CanDive()
     {
         return joint == null && !isDiving && !playerMovement.IsGrounded && !Busy;  
     }
 
+    /// <summary>Starts a dive: records the start time and snaps vertical velocity to at least <see cref="diveStartDownSpeed"/> downward.</summary>
     private void StartDive()
     {
         isDiving = true;
@@ -623,6 +711,10 @@ public class PlayerSwinging : MonoBehaviour
         rb.linearVelocity = new Vector3(velocity.x, Mathf.Min(velocity.y, -diveStartDownSpeed), velocity.z);
     }
 
+    /// <summary>
+    /// Per-physics-step dive update. Ends the dive without bonus on landing, ends it with the carry bonus when the button is released,
+    /// otherwise accelerates downward up to <see cref="maxDiveSpeed"/>.
+    /// </summary>
     private void UpdateDive()
     {
         if (!isDiving) return;
@@ -639,6 +731,7 @@ public class PlayerSwinging : MonoBehaviour
             rb.linearVelocity = new Vector3(velocity.x, -maxDiveSpeed, velocity.z);
     }
 
+    /// <summary>Ends the dive and records its duration. Sets the carry timer so a swing started soon after still gets the dive bonus.</summary>
     /// <param name="keepCarry">If true, a swing started shortly after still gets the dive bonus.</param>
     private void EndDive(bool keepCarry)
     {
@@ -651,9 +744,8 @@ public class PlayerSwinging : MonoBehaviour
     }
 
     /// <summary>
-    /// Called when a web attaches. If you were diving (or just stopped), the speed you were
-    /// falling away from the anchor is turned into swing speed along the arc instead of being
-    /// absorbed by the rope. Longer dives convert more.
+    /// Called when a web attaches. If the player was diving (or just stopped), the speed that was pulling away from the anchor is turned into speed along the arc
+    /// instead of being absorbed by the rope. Longer dives convert more. The speed cap is raised temporarily and decays afterwards.
     /// </summary>
     private void ApplyDiveConversion()
     {
@@ -689,6 +781,7 @@ public class PlayerSwinging : MonoBehaviour
         swingSpeedCap = Mathf.Max(CurrentMaxSpeed, newVelocity.magnitude); // let the boost exist, then decay
     }
 
+    /// <summary>Destroys the swing joint and hides the rope without any release reward. Called by <see cref="WebZip"/> when a zip starts.</summary>
     public void CancelSwingForZip()
     {
         if (joint == null) return;
@@ -699,6 +792,9 @@ public class PlayerSwinging : MonoBehaviour
         wantsSwing = false;
     }
 
+    /// <summary>
+    /// Puts the player into scripted-momentum mode (gravity handled externally, normal movement disabled) and ends any dive. Used by zips and wall runs.
+    /// </summary>
     public void BeginZipMomentum()
     {
         playerMovement.swingMomentum = true;
@@ -707,6 +803,13 @@ public class PlayerSwinging : MonoBehaviour
         EndDive(false);
     }
 
+    /// <summary>
+    /// Finishes a zip or wall run in the air: awards combo, raises the speed cap to the exit speed (it then decays), applies the clamped exit velocity,
+    /// and starts post-release flight with air control and a refilled air jump.
+    /// </summary>
+    /// <param name="exitVelocity">Velocity to leave with.</param>
+    /// <param name="combo">Combo levels to award.</param>
+    /// <param name="dragRelief">Air drag reduction (0 to 1) for the flight that follows.</param>
     public void EndZip(Vector3 exitVelocity, float combo, float dragRelief)
     {
         comboLevel = Mathf.Min(comboLevel + combo, maxComboLevel);
@@ -719,6 +822,7 @@ public class PlayerSwinging : MonoBehaviour
         airJumpsUsed = 0;
     }
 
+    /// <summary>Finishes a wall run that ended on the ground: resets the combo and lands with momentum.</summary>
     public void EndWallOnGround()
     {
         airborneAfterSwing = false;
@@ -726,6 +830,9 @@ public class PlayerSwinging : MonoBehaviour
         LandWithMomentum();
     }
 
+    /// <summary>
+    /// Handles touchdown: starts the landing carry in <see cref="PlayerMovement"/>, keeps the carried speed as a cap, ends scripted momentum and resets the combo.
+    /// </summary>
     private void LandWithMomentum()
     {
         airborneAfterSwing = false;
@@ -735,6 +842,8 @@ public class PlayerSwinging : MonoBehaviour
         comboLevel = 0f;
     }
 
+    /// <summary>Reads the move input as a horizontal direction relative to the camera.</summary>
+    /// <returns>A normalised direction, or <see cref="Vector3.zero"/> when there is no input.</returns>
     private Vector3 GetCameraRelativeInput()
     {
         if (moveAction == null) return Vector3.zero;
@@ -745,8 +854,9 @@ public class PlayerSwinging : MonoBehaviour
         return (forward * input.y + right * input.x).normalized;
     }
 
-    // Rope
+    // ------------------------------------------------------------------------------ Rope
 
+    /// <summary>Animates the rope shooting toward the anchor and keeps its start at the web tip. Does nothing when no web is attached.</summary>
     private void DrawRope()
     {
         if (joint == null) return;
@@ -758,6 +868,10 @@ public class PlayerSwinging : MonoBehaviour
         lineRenderer.SetPosition(1, currentGrapplePosition);
     }
 
+    /// <summary>
+    /// Resets all swing, combo and speed-cap state for a respawn and applies the given starting velocity.
+    /// </summary>
+    /// <param name="velocity">Velocity the player respawns with.</param>
     public void ResetForRespawn(Vector3 velocity)
     {
         CancelInvoke(nameof(ResetSwing));

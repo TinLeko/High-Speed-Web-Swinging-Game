@@ -2,9 +2,9 @@ using Unity.Cinemachine;
 using UnityEngine;
 
 /// <summary>
-/// The faster you go, the wider the view and the farther the camera sits, with a frame-rate-independent ease.
+/// Speed-based camera feel: the faster the target moves, the wider the field of view and the farther the camera sits.
+/// Both change with a frame-rate-independent exponential ease.
 /// </summary>
-
 public class CameraSmoothing : MonoBehaviour
 {
     [SerializeField]
@@ -23,6 +23,10 @@ public class CameraSmoothing : MonoBehaviour
     [SerializeField]
     float smoothing = 5f;
 
+    /// <summary>
+    /// Unity message. Maps the target's speed (relative to <c>maxSpeed</c>) to a field of view and an orbit radius, then eases the camera
+    /// lens and the Orbital Follow radius toward them.
+    /// </summary>
     void LateUpdate()
     {
         float currentSpeed = target.linearVelocity.magnitude;

@@ -2,9 +2,9 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Builds the whole time trial UI in code (prompt, HUD, countdown, results), so there is nothing to set up.
-/// TimeTrialManager creates this automatically. Uses the legacy UI Text and Unity's built-in font.
+/// Builds the whole time trial UI in code (prompt, HUD, countdown, results) so nothing needs to be set up in the editor.
 /// </summary>
+/// <remarks>Created automatically by <see cref="TimeTrialManager"/>. Uses the legacy UI <see cref="Text"/> and Unity's built-in font.</remarks>
 public class TimeTrialUI : MonoBehaviour
 {
     private Font font;
@@ -57,7 +57,7 @@ public class TimeTrialUI : MonoBehaviour
         if (!show) toastText.gameObject.SetActive(false);
     }
 
-    public void SetHud(string time, string info, string speed)
+    public void SetHud(string time, string info)
     {
         timerText.text = time;
         infoText.text = info;

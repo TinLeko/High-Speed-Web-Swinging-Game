@@ -1,8 +1,14 @@
 using UnityEngine;
 
 /// <summary>
-/// The item in the world that starts a time trial. Touch it to get the "start the race?" prompt.
+/// The object in the world that starts a time trial. Touching it opens the "start the race?" prompt.
 /// </summary>
+/// <remarks>
+/// Holds the course (hoop points), medal times, optional time limit and respawn rules, and shows a spinning marker above it.
+/// Needs a <see cref="SphereCollider"/> on the same GameObject, which is set up as a trigger. Detects the player by its <see cref="PlayerSwinging"/>.
+/// </remarks>
+
+[RequireComponent(typeof(SphereCollider))]
 public class TimeTrialStarter : MonoBehaviour
 {
     [Header("Trial")]
@@ -44,6 +50,7 @@ public class TimeTrialStarter : MonoBehaviour
     private Transform marker;
     private Renderer[] markerRenderers;
 
+    /// <summary>True if at least one hoop point is assigned.</summary>
     public bool HasValidCourse
     {
         get
@@ -55,6 +62,7 @@ public class TimeTrialStarter : MonoBehaviour
         }
     }
 
+    /// <summary>Where the player respawns before passing any hoop: the start respawn point if set, otherwise just above this object.</summary>
     public Vector3 StartRespawnPosition
     {
         get
@@ -70,6 +78,11 @@ public class TimeTrialStarter : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Gets the medal earned by a finishing time.
+    /// </summary>
+    /// <param name="time">Finishing time in seconds.</param>
+    /// <returns>Gold, silver or bronze if the time is within the matching threshold, otherwise <see cref="TrialMedal.None"/>.</returns>
     public TrialMedal GetMedal(float time)
     {
         if (time <= goldTime) return TrialMedal.Gold;
@@ -78,6 +91,7 @@ public class TimeTrialStarter : MonoBehaviour
         return TrialMedal.None;
     }
 
+    /// <summary>Unity editor message (on adding the component). Makes the sphere collider a trigger with <see cref="triggerRadius"/>.</summary>
     private void Reset()
     {
         var sphere = GetComponent<SphereCollider>();
@@ -85,6 +99,7 @@ public class TimeTrialStarter : MonoBehaviour
         sphere.radius = triggerRadius;
     }
 
+    /// <summary>Unity message. Configures the trigger collider and builds the world marker if a prefab is assigned.</summary>
     private void Awake()
     {
         var sphere = GetComponent<SphereCollider>();
@@ -94,6 +109,8 @@ public class TimeTrialStarter : MonoBehaviour
         if (markerPrefab != null) BuildMarker();
     }
 
+    /// <summary>Unity message. Tells the <see cref="TimeTrialManager"/> when the player enters the trigger.</summary>
+    /// <param name="other">The collider that entered.</param>
     private void OnTriggerEnter(Collider other)
     {
         if (other.GetComponentInParent<PlayerSwinging>() == null) return;
@@ -101,6 +118,8 @@ public class TimeTrialStarter : MonoBehaviour
             TimeTrialManager.Instance.OnPlayerEnteredStarter(this);
     }
 
+    /// <summary>Unity message. Tells the <see cref="TimeTrialManager"/> when the player leaves the trigger.</summary>
+    /// <param name="other">The collider that left.</param>
     private void OnTriggerExit(Collider other)
     {
         if (other.GetComponentInParent<PlayerSwinging>() == null) return;
@@ -108,7 +127,7 @@ public class TimeTrialStarter : MonoBehaviour
             TimeTrialManager.Instance.OnPlayerLeftStarter(this);
     }
 
-    // Marker
+    // ------------------------------------------------------------------------------ Marker
     private void BuildMarker()
     {
         var markerObject = new GameObject("TrialMarker");
@@ -124,7 +143,9 @@ public class TimeTrialStarter : MonoBehaviour
         RefreshMarker();
     }
 
-    /// <summary>The marker is a set color until you earn a medal here, then it takes the colour of your best one.</summary>
+    /// <summary>
+    /// Updates the marker colour: it keeps its own colour until a medal is earned here, then takes the colour of the best medal. Called after a race finishes.
+    /// </summary>
     public void RefreshMarker()
     {
         if (markerRenderers == null) return;
@@ -134,6 +155,7 @@ public class TimeTrialStarter : MonoBehaviour
             RaceModelUtils.Tint(markerRenderers, TimeTrialManager.MedalColor(best));
     }
 
+    /// <summary>Unity message. Spins the marker and makes it bob up and down.</summary>
     private void Update()
     {
         if (marker == null) return;
@@ -142,8 +164,11 @@ public class TimeTrialStarter : MonoBehaviour
         marker.localPosition = Vector3.up * (markerHeight + Mathf.Sin(Time.time * 2f) * markerBobAmount);
     }
 
-    // Editor preview
+    // -------------------------------------------------------------------- Editor preview
 
+    /// <summary>
+    /// Unity editor message. Draws the trigger radius and a preview of the course: lines between the points, a circle per hoop, its direction and its number.
+    /// </summary>
     private void OnDrawGizmos()
     {
         Gizmos.color = new Color(0.1f, 0.9f, 1f, 0.7f);
@@ -169,6 +194,10 @@ public class TimeTrialStarter : MonoBehaviour
         }
     }
 
+    /// <summary>Draws a gizmo circle in the local XY plane of the given rotation.</summary>
+    /// <param name="center">Centre of the circle.</param>
+    /// <param name="rotation">Orientation; the circle lies in the plane facing its forward axis.</param>
+    /// <param name="radius">Circle radius.</param>
     private static void DrawCircle(Vector3 center, Quaternion rotation, float radius)
     {
         const int steps = 32;

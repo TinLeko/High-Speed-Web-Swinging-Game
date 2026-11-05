@@ -1,10 +1,9 @@
 using UnityEngine;
 
 /// <summary>
-/// Floats above the player and points arrow model at the next hoop (including up and down).
-/// Created by TimeTrialManager, which calls Setup. If no arrow prefab is assigned, nothing is shown.
-/// Model must point along +Z.
+/// Floats above the player and points an arrow model at the next hoop, including up and down.
 /// </summary>
+/// <remarks>Created by <see cref="TimeTrialManager"/>, which calls <see cref="Setup"/>. If no arrow prefab is assigned, nothing is shown. The model must point along +Z.</remarks>
 public class RaceNavigationArrow : MonoBehaviour
 {
     public Transform follow;
@@ -16,6 +15,10 @@ public class RaceNavigationArrow : MonoBehaviour
     private GameObject modelRoot;
     private bool shown;
 
+    /// <summary>Creates the arrow model (replacing any previous one), removes its colliders and keeps it hidden until a target is set.</summary>
+    /// <param name="prefab">The arrow model; null means no arrow is shown.</param>
+    /// <param name="scale">Scale multiplier for the model.</param>
+    /// <param name="arrowHeight">Height above the followed object.</param>
     public void Setup(GameObject prefab, float scale, float arrowHeight)
     {
         height = arrowHeight;
@@ -31,18 +34,23 @@ public class RaceNavigationArrow : MonoBehaviour
         modelRoot.SetActive(false);
     }
 
+    /// <summary>Sets the world position the arrow points at and enables it.</summary>
+    /// <param name="point">Target position.</param>
     public void SetTarget(Vector3 point)
     {
         targetPoint = point;
         hasTarget = true;
     }
 
+    /// <summary>Removes the target and hides the arrow.</summary>
     public void Clear()
     {
         hasTarget = false;
         SetShown(false);
     }
 
+    /// <summary>Shows or hides the model, only touching it when the state actually changes.</summary>
+    /// <param name="show">Whether the model should be visible.</param>
     private void SetShown(bool show)
     {
         if (modelRoot == null || shown == show) return;
@@ -50,6 +58,9 @@ public class RaceNavigationArrow : MonoBehaviour
         modelRoot.SetActive(show);
     }
 
+    /// <summary>
+    /// Unity message. Hides the arrow if there is no target, followee or model. Otherwise it hovers above the player with a gentle bob and eases its rotation toward the target.
+    /// </summary>
     private void LateUpdate()
     {
         if (!hasTarget || follow == null || modelRoot == null)

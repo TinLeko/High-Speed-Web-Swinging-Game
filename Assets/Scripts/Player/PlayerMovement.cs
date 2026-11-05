@@ -2,10 +2,13 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// This is the baseline controller. It handles everything that is not a special ability: 
-/// walking, sprinting, a charge-up jump, slopes, ground friction and air movement. 
-/// When another system takes over (`swingMomentum == true`) it does nothing.
+/// Baseline movement controller for everything that is not a special ability: walking, sprinting, charge-up jumping, slopes, ground friction and air movement.
 /// </summary>
+/// <remarks>
+/// When another system takes over (<see cref="swingMomentum"/> is true: swinging, zipping, wall-running or post-release flight)
+/// this controller applies no movement force and no speed cap. Requires a <see cref="Rigidbody"/>, <see cref="WebZip"/> and
+/// <see cref="PlayerSwinging"/> on the same GameObject. Inputs: "Move", "Jump" (hold to charge, release to jump) and "Sprint".
+/// </remarks>
 
 public class PlayerMovement : MonoBehaviour
 {
@@ -78,6 +81,7 @@ public class PlayerMovement : MonoBehaviour
     private WebZip zip;
     private PlayerSwinging playerSwinging;
 
+    /// <summary>High-level movement state, used to pick the move speed.</summary>
     public enum MovementState
     {
         walking,
@@ -86,16 +90,26 @@ public class PlayerMovement : MonoBehaviour
         swinging
     }
 
+    /// <summary>
+    /// Unity message. Enables the "Player" input action map.
+    /// </summary>
     private void OnEnable()
     {
         inputActions.FindActionMap("Player").Enable();
     }
 
+    /// <summary>
+    /// Unity message. Disables the "Player" input action map.
+    /// </summary>
     private void OnDisable()
     {
         inputActions.FindActionMap("Player").Disable();
     }
 
+    /// <summary>
+    /// Unity message. Looks up the input actions and caches 
+    /// the <see cref="WebZip"/> and <see cref="PlayerSwinging"/> components.
+    /// </summary>
     private void Awake()
     {
         moveAction = InputSystem.actions.FindAction("Move");
@@ -105,6 +119,11 @@ public class PlayerMovement : MonoBehaviour
         playerSwinging = GetComponent<PlayerSwinging>();
     }
 
+    /// <summary>
+    /// Unity message. Caches the Rigidbody, 
+    /// freezes its rotation and initialises the jump charge to the 
+    /// minimum force.
+    /// </summary>
     void Start()
     {
         rb = GetComponent<Rigidbody>();
@@ -112,13 +131,22 @@ public class PlayerMovement : MonoBehaviour
         currentJumpForce = minJumpForce;
     }
 
+    /// <summary>
+    /// Applies movement forces for the current surface: along the slope plane 
+    /// when on a walkable slope (with extra downward force while moving up),
+    /// full force on flat ground, reduced force plus air drag in the air. 
+    /// Does nothing while <see cref="swingMomentum"/> is set.
+    /// Also resets the chained-zip counter.
+    /// </summary>
     private void MovePlayer()
     {
         // PlayerSwinging owns all movement while swinging and right after release.
         if (swingMomentum)
             return;
 
-        zip.consecutiveZips = 0;
+        if (zip != null)
+            zip.consecutiveZips = 0;
+
         if (OnSlope() && grounded && !exitingSlope)
         {
             rb.AddForce(GetSlopeMoveDirection() * moveSpeed, ForceMode.Force);
@@ -138,12 +166,23 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Unity message. Applies movement forces, then updates the grounded 
+    /// flag with a downward raycast.
+    /// </summary>
     private void FixedUpdate()
     {
         MovePlayer();
         grounded = Physics.Raycast(transform.position, Vector3.down, playerHeight * 0.5f + 0.2f, groundMask);
     }
 
+    /// <summary>
+    /// Unity message. Handles the charge-up jump (jump fires on button release while grounded), 
+    /// clamps speed, counts down the landing carry timer,
+    /// sets ground drag, reads the move input into a camera-relative direction,
+    /// updates the movement state and toggles gravity
+    /// (off on walkable slopes so the player does not slide).
+    /// </summary>
     void Update()
     {
         JumpControl();
@@ -180,6 +219,10 @@ public class PlayerMovement : MonoBehaviour
         rb.useGravity = swingMomentum || !(OnSlope() && grounded);
     }
 
+    /// <summary>
+    /// Limits speed to the current cap: total speed on slopes, horizontal speed elsewhere (vertical velocity is preserved so jumps and falls are unaffected).
+    /// Skipped while <see cref="swingMomentum"/> is set.
+    /// </summary>
     private void SpeedControl()
     {
         // Don't cap speed while swinging, beacuse PlayerSwinging has its own maxSpeed.
@@ -207,6 +250,12 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Grows the jump force while the jump button is held 
+    /// (unless the press was already consumed), 
+    /// between <see cref="minJumpForce"/> and 
+    /// <see cref="maxJumpForce"/>.
+    /// </summary>
     private void JumpControl()
     {
         isCharging = jumpAction.IsPressed() && !jumpConsumed;
@@ -218,6 +267,9 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Performs the jump: zeroes vertical velocity and applies the charged upward impulse.
+    /// </summary>
     private void Jump()
     {
         exitingSlope = true;
@@ -225,12 +277,18 @@ public class PlayerMovement : MonoBehaviour
         rb.AddForce(transform.up * currentJumpForce, ForceMode.Impulse);
     }
 
+    /// <summary>
+    /// Invoked after <see cref="jumpCooldown"/>. Allows jumping again and ends the slope-exit state.
+    /// </summary>
     private void ResetJump()
     {
         canJump = true;
         exitingSlope = false;
     }
 
+    /// <summary>
+    /// Chooses the <see cref="MovementState"/> (swinging, sprinting, walking or air) and sets the matching move speed.
+    /// </summary>
     private void StateHandler()
     {
         if (isSwinging)
@@ -254,6 +312,10 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Checks whether the surface below is a slope steeper than flat but shallower than <see cref="maxSlopeAngle"/>. Stores the hit in <c>slopeHit</c>.
+    /// </summary>
+    /// <returns><c>true</c> if the player is standing on a walkable slope.</returns>
     private bool OnSlope()
     {
         if (Physics.Raycast(transform.position, Vector3.down, out slopeHit, playerHeight * 0.5f + 0.3f))
@@ -265,11 +327,20 @@ public class PlayerMovement : MonoBehaviour
         return false;
     }
 
+    /// <summary>
+    /// Projects the movement direction onto the slope surface.
+    /// </summary>
+    /// <returns>A normalised direction parallel to the slope.</returns>
     private Vector3 GetSlopeMoveDirection()
     {
         return Vector3.ProjectOnPlane(moveDirection, slopeHit.normal).normalized;
     }
 
+    /// <summary>
+    /// Called by <see cref="PlayerSwinging"/> on touchdown. Keeps <see cref="landingSpeedKeep"/> of the 
+    /// horizontal speed and starts a timer during which
+    /// the speed cap and ground drag ease back to normal, so a fast landing is not stopped instantly.
+    /// </summary>
     public void BeginLandingCarry()
     {
         Vector3 v = rb.linearVelocity;
@@ -279,12 +350,20 @@ public class PlayerMovement : MonoBehaviour
         carryTimer = carryDuration;
     }
 
+    /// <summary>
+    /// Gets the horizontal speed cap, which fades from the carried landing speed down to the normal move speed over <see cref="carryDuration"/>.
+    /// </summary>
+    /// <returns>The speed cap in m/s.</returns>
     private float CurrentSpeedCap()
     {
         if (carryTimer <= 0f) return moveSpeed;
         return Mathf.Max(moveSpeed, Mathf.Lerp(moveSpeed, carryCap, carryTimer / carryDuration));
     }
 
+    /// <summary>
+    /// Gets the ground drag. It starts low right after a landing and 
+    /// rises quadratically to <see cref="groundDrag"/> as the carry ends.
+    /// </summary>
     private float CurrentGroundDrag()
     {
         if (carryTimer <= 0f) return groundDrag;
@@ -292,6 +371,10 @@ public class PlayerMovement : MonoBehaviour
         return Mathf.Lerp(groundDrag * carryDragRatio, groundDrag, t * t);
     }
 
+    /// <summary>
+    /// Airborne handling: adds extra gravity (more while falling) and applies horizontal drag with a constant and a speed-squared-like term.
+    /// Vertical velocity is untouched.
+    /// </summary>
     private void AirDrag()
     {
         float extra = postReleaseGravity;

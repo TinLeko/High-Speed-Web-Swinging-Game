@@ -356889,7 +356889,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d54ba8738879ed8458fb6cd8c1a6e80e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TimeTrialStarter
-  trialId: trial1
+  trialId: trial3
   trialName: Rooftop Run
   hoopPoints:
   - {fileID: 2017613671}

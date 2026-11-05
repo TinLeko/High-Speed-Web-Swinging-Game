@@ -3,6 +3,7 @@ using System.Globalization;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+/// <summary>Medal awarded for a time trial, ordered from worst to best so the values can be compared numerically.</summary>
 public enum TrialMedal { 
     None = 0,
     Bronze = 1,
@@ -11,16 +12,27 @@ public enum TrialMedal {
 }
 
 /// <summary>
-/// Runs the time trials. One is in the scene; it finds the player, and builds the UI and
-/// by itself. TimeTrialStarter objects in the world talk to it.
-/// Flow:  touch a starter -> prompt (yes/no) -> countdown -> race (fly through hoops in order)
-///        -> results (time, top speed, medal, best time).
-/// Hoop passing is a swept plane test, so it works at any speed (no tunneling through thin triggers).
+/// Runs the time trials. One instance lives in the scene; it finds the player and creates the UI and the navigation arrow by itself.
+/// <see cref="TimeTrialStarter"/> objects in the world talk to it.
 /// </summary>
+/// <remarks>
+/// <para>Flow: touch a starter, answer the prompt (yes/no), countdown, race (fly through the hoops in order), results (time, top speed, medal, best time).</para>
+/// <para>Hoop passing is a swept plane test between physics steps, so it works at any speed (no tunnelling through thin triggers).</para>
+/// <para>Needs a <see cref="PlayerSwinging"/> in the scene (or <see cref="playerRb"/> assigned). Best times and medals are stored in <see cref="PlayerPrefs"/>.
+/// Inputs are the "TrialConfirm", "TrialCancel" and "TrialRespawn" actions, with keyboard fallbacks.</para>
+/// </remarks>
 public class TimeTrialManager : MonoBehaviour
 {
+    /// <summary>The single active manager, or <c>null</c> if none exists.</summary>
     public static TimeTrialManager Instance { get; private set; }
+
+    /// <summary>
+    /// Raised after the player is teleported (e.g. on respawn). Passes the player transform and the world-space displacement so cameras can follow
+    /// (see <c>CameraEffects</c>).
+    /// </summary>
     public static event System.Action<Transform, Vector3> PlayerTeleported;
+
+    /// <summary>The phases of a trial.</summary>
     public enum State { Idle, Prompt, Countdown, Racing, Results }
 
     [Header("References (found automatically if left empty)")]
@@ -51,8 +63,10 @@ public class TimeTrialManager : MonoBehaviour
     [Header("Time limit")]
     public float urgentSeconds = 10f;
 
+    /// <summary>The current phase of the trial.</summary>
     public State CurrentState { get; private set; } = State.Idle;
 
+    /// <summary>Snapshot of one hoop for the pass test: position, orientation (forward is the pass direction) and effective radius.</summary>
     private struct HoopData
     {
         public Vector3 position;
@@ -79,10 +93,15 @@ public class TimeTrialManager : MonoBehaviour
     private float nextRespawnTime;
     private bool justRespawned;
 
+    /// <summary>Race time in seconds: time since the race started plus accumulated respawn penalties.</summary>
     private float Elapsed => Time.time - raceStartTime + penaltyTotal;
 
-    // setup
+    // ----------------------------------------------------------------------------- Setup
 
+    /// <summary>
+    /// Unity message. Enforces the singleton, finds the player and its <see cref="Wallrun"/> and <see cref="WebZip"/>, finds or creates the
+    /// <see cref="TimeTrialUI"/>, creates the <see cref="RaceNavigationArrow"/> and looks up the input actions.
+    /// </summary>
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -112,28 +131,43 @@ public class TimeTrialManager : MonoBehaviour
         respawnAction = FindAction("TrialRespawn");
     }
 
+    /// <summary>Unity message. Clears <see cref="Instance"/> if this was the active manager.</summary>
     private void OnDestroy()
     {
         if (Instance == this) Instance = null;
     }
 
+    /// <summary>Finds an input action by name in the project-wide actions.</summary>
+    /// <param name="actionName">Name of the action.</param>
+    /// <returns>The action, or <c>null</c> if the actions asset or the action is missing.</returns>
     private static InputAction FindAction(string actionName)
     {
         return InputSystem.actions != null ? InputSystem.actions.FindAction(actionName) : null;
     }
 
+    /// <summary>True on the frame the confirm input was pressed.</summary>
     private bool ConfirmPressed => Pressed(confirmAction, confirmKey);
+
+    /// <summary>True on the frame the cancel input was pressed.</summary>
     private bool CancelPressed => Pressed(cancelAction, cancelKey);
+
+    /// <summary>True on the frame the respawn input was pressed.</summary>
     private bool RespawnPressed => Pressed(respawnAction, respawnKey);
 
+    /// <summary>Checks a button press using the input action if it exists, otherwise the fallback keyboard key.</summary>
+    /// <param name="action">The input action, may be <c>null</c>.</param>
+    /// <param name="fallback">Key used when the action is missing.</param>
+    /// <returns><c>true</c> if pressed this frame.</returns>
     private static bool Pressed(InputAction action, Key fallback)
     {
         if (action != null) return action.WasPressedThisFrame();
         return Keyboard.current != null && Keyboard.current[fallback].wasPressedThisFrame;
     }
 
-    // called by TimeTrialStarter
+    // -------------------------------------------------------------- Called by TimeTrialStarter
 
+    /// <summary>Called by a <see cref="TimeTrialStarter"/> when the player touches it. Opens the start prompt if no trial is in progress.</summary>
+    /// <param name="starter">The starter that was touched.</param>
     public void OnPlayerEnteredStarter(TimeTrialStarter starter)
     {
         if (CurrentState != State.Idle) return;
@@ -143,14 +177,20 @@ public class TimeTrialManager : MonoBehaviour
         ui.ShowPrompt(starter.trialName.ToUpperInvariant(), BuildPromptBody(starter));
     }
 
+    /// <summary>Called by a <see cref="TimeTrialStarter"/> when the player walks away. Closes the prompt if it belongs to that starter.</summary>
+    /// <param name="starter">The starter that was left.</param>
     public void OnPlayerLeftStarter(TimeTrialStarter starter)
     {
         if (CurrentState == State.Prompt && promptStarter == starter)
             ClosePrompt();
     }
 
-    // state machine
+    // ----------------------------------------------------------------------- State machine
 
+    /// <summary>
+    /// Unity message. Runs the state machine: confirm or cancel at the prompt; countdown ticking; while racing, abort, respawn, time-limit check and HUD refresh;
+    /// at the results, retry or close.
+    /// </summary>
     private void Update()
     {
         switch (CurrentState)
@@ -181,6 +221,10 @@ public class TimeTrialManager : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Unity message. While racing, samples the top speed and tests whether the player crossed the next hoop since the last physics step.
+    /// The step right after a respawn only resets the tracked position so the teleport does not count as a crossing.
+    /// </summary>
     private void FixedUpdate()
     {
         if (CurrentState != State.Racing || playerRb == null) return;
@@ -201,6 +245,7 @@ public class TimeTrialManager : MonoBehaviour
         previousPosition = current;
     }
 
+    /// <summary>Dismisses the start prompt and returns to idle.</summary>
     private void ClosePrompt()
     {
         CurrentState = State.Idle;
@@ -208,12 +253,19 @@ public class TimeTrialManager : MonoBehaviour
         ui.HidePrompt();
     }
 
+    /// <summary>Retries a trial: teleports the player back to the starter and starts the race again.</summary>
+    /// <param name="starter">The starter to restart.</param>
     private void RestartRace(TimeTrialStarter starter)
     {
         TeleportPlayer(starter.transform.position, Vector3.zero);
         StartRace(starter);
     }
 
+    /// <summary>
+    /// Starts a trial: validates the course and hoop prefab, builds the hoops, resets race statistics, sets the time limit, enters the countdown and sets up the HUD.
+    /// Does nothing if the course or prefab is missing. Skips the countdown if it is zero seconds.
+    /// </summary>
+    /// <param name="starter">The starter defining the course, limit and respawn rules.</param>
     private void StartRace(TimeTrialStarter starter)
     {
         if (starter == null || playerRb == null) return;
@@ -251,12 +303,13 @@ public class TimeTrialManager : MonoBehaviour
             if (starter.respawnPenalty > 0f) hint += " (+" + Num(starter.respawnPenalty, "0.#") + " s)";
         }
         ui.ShowHud(true, hint);
-        ui.SetHud(FormatTime(0f), "HOOP 1/" + hoops.Count, "0 m/s");
+        ui.SetHud(FormatTime(0f), "HOOP 1/" + hoops.Count);
         ui.SetLimit(activeLimit > 0f ? "TIME LEFT  " + FormatTime(activeLimit) : "", false);
 
         if (countdownTimer <= 0f) BeginRacing();
     }
 
+    /// <summary>Ends the countdown: enters the racing state, starts the clock, shows "GO!" and highlights the first hoops.</summary>
     private void BeginRacing()
     {
         CurrentState = State.Racing;
@@ -266,6 +319,7 @@ public class TimeTrialManager : MonoBehaviour
         RefreshHoopVisuals();
     }
 
+    /// <summary>Marks the current hoop as collected and advances to the next one, or finishes the race after the last.</summary>
     private void OnHoopPassed()
     {
         if (nextIndex < hoopVisuals.Count && hoopVisuals[nextIndex] != null)
@@ -281,6 +335,10 @@ public class TimeTrialManager : MonoBehaviour
         RefreshHoopVisuals();
     }
 
+    /// <summary>
+    /// Completes the race. If the time limit was exceeded it fails instead. Otherwise it works out the medal, saves the best time and best medal,
+    /// builds the next-goal text, shows the results, clears the hoops and arrow, and refreshes the starter's marker.
+    /// </summary>
     private void FinishRace()
     {
         float time = Elapsed;
@@ -326,6 +384,7 @@ public class TimeTrialManager : MonoBehaviour
         starter.RefreshMarker();
     }
 
+    /// <summary>Ends the race as failed (time ran out) and shows the "did not finish" results with hoop progress and the best time.</summary>
     private void FailRace()
     {
         CurrentState = State.Results;
@@ -342,6 +401,7 @@ public class TimeTrialManager : MonoBehaviour
         ClearHoops();
     }
 
+    /// <summary>Cancels the race without results: hides all UI and removes the hoops and arrow.</summary>
     private void AbortRace()
     {
         CurrentState = State.Idle;
@@ -350,25 +410,34 @@ public class TimeTrialManager : MonoBehaviour
         ClearHoops();
     }
 
+    /// <summary>Closes the results panel and returns to idle.</summary>
     private void CloseResults()
     {
         CurrentState = State.Idle;
         ui.HideResults();
     }
 
+    /// <summary>Formats the top speed in m/s and km/h for the results screen.</summary>
+    /// <returns>The formatted text.</returns>
     private string TopSpeedText()
     {
         return "Top speed  " + Num(topSpeed, "0.0") + " m/s  (" + Num(topSpeed * 3.6f, "0") + " km/h)";
     }
 
+    /// <summary>Formats the number of respawns and total penalty for the results screen.</summary>
+    /// <returns>The summary, or an empty string if the player never respawned.</returns>
     private string RespawnSummary()
     {
         if (respawnCount == 0) return "";
         return "Respawns  " + respawnCount + "  (+" + Num(penaltyTotal, "0.0") + " s)";
     }
 
-    // checkpoint respawn
+    // --------------------------------------------------------------------- Checkpoint respawn
 
+    /// <summary>
+    /// Respawns the player at the last passed hoop (launched along its direction at the starter's respawn speed) or at the start if none was passed.
+    /// Requires respawning to be allowed and the cooldown to have elapsed. Adds the time penalty and shows a message.
+    /// </summary>
     private void TryRespawn()
     {
         TimeTrialStarter starter = currentStarter;
@@ -410,6 +479,12 @@ public class TimeTrialManager : MonoBehaviour
         ui.ShowMessage(respawnMessage, 1.5f);
     }
 
+    /// <summary>
+    /// Moves the player instantly and drops whatever it was doing (wall run, zip, swing, dive). Resets the Rigidbody, syncs physics, flags the next
+    /// physics step as a respawn and raises <see cref="PlayerTeleported"/>.
+    /// </summary>
+    /// <param name="position">Destination in world space.</param>
+    /// <param name="velocity">Velocity to start with.</param>
     private void TeleportPlayer(Vector3 position, Vector3 velocity)
     {
         Vector3 delta = position - playerRb.position;
@@ -431,8 +506,10 @@ public class TimeTrialManager : MonoBehaviour
         PlayerTeleported?.Invoke(playerRb.transform, delta);
     }
 
-    // Hoops
+    // ----------------------------------------------------------------------------- Hoops
 
+    /// <summary>Clears old hoops and creates the hoop data and visual for each course point. The radius is the starter's hoop radius times the point's scale.</summary>
+    /// <param name="starter">The starter whose course to build.</param>
     private void BuildHoops(TimeTrialStarter starter)
     {
         ClearHoops();
@@ -452,6 +529,7 @@ public class TimeTrialManager : MonoBehaviour
         }
     }
 
+    /// <summary>Destroys the hoop visuals and clears the hoop data. Hoops already fading out are left to remove themselves.</summary>
     private void ClearHoops()
     {
         // Hoops that are already fading out remove themselves.
@@ -464,6 +542,7 @@ public class TimeTrialManager : MonoBehaviour
         hoops.Clear();
     }
 
+    /// <summary>Updates each hoop's state: passed hoops collected, next hoop active, the one after previewed, the rest hidden. Points the arrow at the next hoop.</summary>
     private void RefreshHoopVisuals()
     {
         for (int i=0; i < hoopVisuals.Count; i++)
@@ -485,6 +564,14 @@ public class TimeTrialManager : MonoBehaviour
             arrow.SetTarget(hoops[nextIndex].position);
     }
 
+    /// <summary>
+    /// Swept test for passing through a hoop. Checks that the movement from <paramref name="from"/> to <paramref name="to"/> crosses the hoop's plane
+    /// and that the crossing point lies within the hoop radius plus <see cref="passPadding"/>. Direction of travel does not matter.
+    /// </summary>
+    /// <param name="from">Position at the previous physics step.</param>
+    /// <param name="to">Position at the current physics step.</param>
+    /// <param name="hoop">The hoop to test.</param>
+    /// <returns><c>true</c> if the hoop was passed.</returns>
     private bool CrossedHoop(Vector3 from, Vector3 to, HoopData hoop)
     {
         Vector3 normal = hoop.rotation * Vector3.forward;
@@ -500,8 +587,9 @@ public class TimeTrialManager : MonoBehaviour
         return Vector3.Distance(crossing, hoop.position) <= hoop.radius + passPadding;
     }
 
-    // HUD
+    // ---------------------------------------------------------------------------------- HUD
 
+    /// <summary>Refreshes the HUD with the race time, hoop progress, distance to the next hoop and, if there is a limit, the time left (urgent when low).</summary>
     private void UpdateHud()
     {
         float elapsed = Elapsed;
@@ -509,9 +597,7 @@ public class TimeTrialManager : MonoBehaviour
         float distance = Vector3.Distance(playerRb.position, hoopPosition);
         float speed = playerRb.linearVelocity.magnitude;
 
-        ui.SetHud(FormatTime(elapsed),
-                  "HOOP " + (nextIndex + 1) + "/" + hoops.Count + "   |   " + Num(distance, "0") + " m",
-                  Num(speed, "0") + " m/s");
+        ui.SetHud(FormatTime(elapsed), "HOOP " + (nextIndex + 1) + "/" + hoops.Count + "   |   " + Num(distance, "0") + " m");
 
         if (activeLimit > 0f)
         {
@@ -520,6 +606,9 @@ public class TimeTrialManager : MonoBehaviour
         }
     }
 
+    /// <summary>Builds the start prompt text: best time, medal times, rules (time limit and respawn) and the confirm/cancel keys.</summary>
+    /// <param name="starter">The starter to describe.</param>
+    /// <returns>The multi-line prompt text.</returns>
     private string BuildPromptBody(TimeTrialStarter starter)
     {
         float best = PlayerPrefs.GetFloat(BestTimeKey(starter.trialId), 0f);
@@ -535,11 +624,21 @@ public class TimeTrialManager : MonoBehaviour
                "Start the race?\n" + "[" + confirmKey + "] Yes          [" + cancelKey + "] No";
     }
 
-    // Helpers
+    // --------------------------------------------------------------------------- Helpers
 
+    /// <summary>Gets the <see cref="PlayerPrefs"/> key that stores the best time for a trial.</summary>
+    /// <param name="trialId">The unique trial id.</param>
+    /// <returns>The key.</returns>
     public static string BestTimeKey(string trialId) => "TimeTrial_BestTime_" + trialId;
+
+    /// <summary>Gets the <see cref="PlayerPrefs"/> key that stores the best medal for a trial.</summary>
+    /// <param name="trialId">The unique trial id.</param>
+    /// <returns>The key.</returns>
     public static string BestMedalKey(string trialId) => "TimeTrial_BestMedal_" + trialId;
 
+    /// <summary>Gets the display colour for a medal (gold, silver, bronze, or grey for none).</summary>
+    /// <param name="medal">The medal.</param>
+    /// <returns>The colour.</returns>
     public static Color MedalColor(TrialMedal medal)
     {
         switch (medal)
@@ -551,6 +650,9 @@ public class TimeTrialManager : MonoBehaviour
         }
     }
 
+    /// <summary>Formats seconds as <c>m:ss.mmm</c> using the invariant culture. Negative values are treated as zero.</summary>
+    /// <param name="seconds">Time in seconds.</param>
+    /// <returns>The formatted time.</returns>
     public static string FormatTime(float seconds)
     {
         seconds = Mathf.Max(0f, seconds);
@@ -559,6 +661,10 @@ public class TimeTrialManager : MonoBehaviour
         return minutes + ":" + rest.ToString("00.000", CultureInfo.InvariantCulture);
     }
 
+    /// <summary>Formats a number with the invariant culture so text does not change with the system locale.</summary>
+    /// <param name="value">The number.</param>
+    /// <param name="format">A numeric format string.</param>
+    /// <returns>The formatted number.</returns>
     private static string Num(float value, string format)
     {
         return value.ToString(format, CultureInfo.InvariantCulture);

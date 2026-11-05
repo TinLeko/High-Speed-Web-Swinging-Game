@@ -3,7 +3,8 @@ using TMPro;
 using UnityEngine.UI;
 
 /// <summary>
-/// Contains a simple speed readout and a speed-lines particle effect.
+/// Simple HUD: a speed readout and a speed-lines 
+/// particle effect whose density scales with horizontal speed.
 /// </summary>
 public class UIManager : MonoBehaviour
 {
@@ -23,6 +24,9 @@ public class UIManager : MonoBehaviour
 
     private Vector3 horizontalVelocity;
 
+    /// <summary>
+    /// Unity message. Caches the particle system's emission module if a speed-lines system is assigned.
+    /// </summary>
     private void Start()
     {
         if (speedLinesParticle != null)
@@ -30,6 +34,12 @@ public class UIManager : MonoBehaviour
             emissionModule = speedLinesParticle.emission;
         }
     }
+
+    /// <summary>
+    /// Unity message. Computes the player's horizontal speed, scales the speed-line emission rate between
+    /// <see cref="minSpeedToShowLines"/> and <see cref="maxSpeed"/>, and updates the text with the speed converted by <see cref="speedMultiplier"/>
+    /// (3.6 turns m/s into km/h).
+    /// </summary>
     void Update()
     {
         if (playerRb == null) return;

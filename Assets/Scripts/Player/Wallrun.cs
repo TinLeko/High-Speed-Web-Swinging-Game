@@ -2,12 +2,17 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Wall run / climb / crawl.
-///   Run key held, fast, hitting the wall at an angle -> Running (sideways, follows corners)
-///   Run key held, fast, hitting the wall head-on     -> Climbing (straight up)
-///   Walk (or fall) slowly into a wall, no key needed -> Crawling (move freely on the wall)
-/// Jump leaps off the wall at any time.
+/// Wall run, climb and crawl.
 /// </summary>
+/// <remarks>
+/// <list type="bullet">
+/// <item><description>Run key held, fast, hitting the wall at an angle: <see cref="WallMode.Running"/> (sideways, follows corners).</description></item>
+/// <item><description>Run key held, fast, hitting the wall head-on: <see cref="WallMode.Climbing"/> (straight up).</description></item>
+/// <item><description>Walking (or falling) slowly into a wall, no key needed: <see cref="WallMode.Crawling"/> (free movement on the wall).</description></item>
+/// </list>
+/// Jump leaps off the wall at any time. Entry and exit hand control to <see cref="PlayerSwinging"/>, which owns the post-wall momentum.
+/// Requires <see cref="Rigidbody"/>, <see cref="PlayerSwinging"/>, <see cref="PlayerMovement"/> and <see cref="WebZip"/> on the same GameObject.
+/// </remarks>
 public class Wallrun : MonoBehaviour
 {
     public enum WallMode { None, Running, Climbing, Crawling }
@@ -103,9 +108,17 @@ public class Wallrun : MonoBehaviour
     public float ledgeVaultSpeed = 8f;
 
     // Read these from other scripts (camera, animation, UI...)
+
+    /// <summary>True while the player is attached to a wall in any mode.</summary>
     public bool IsActive { get; private set; }
+
+    /// <summary>The current <see cref="WallMode"/>, or <see cref="WallMode.None"/> when not on a wall.</summary>
     public WallMode Mode { get; private set; } = WallMode.None;
+
+    /// <summary>The (smoothed) normal of the wall the player is attached to.</summary>
     public Vector3 WallNormal => wallNormal;
+
+    /// <summary>The direction of travel along the wall while running.</summary>
     public Vector3 RunDirection => runDir;
 
     private Rigidbody rb;
@@ -127,8 +140,10 @@ public class Wallrun : MonoBehaviour
     private float pendingYaw;
     private float lastCornerTime = -999f;
 
+    /// <summary>True while the run ("Sprint") action is held.</summary>
     private bool RunHeld => runAction != null && runAction.IsPressed();
 
+    /// <summary>Unity message. Caches sibling components and looks up the "Move", "Jump" and "Sprint" input actions.</summary>
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
@@ -141,12 +156,14 @@ public class Wallrun : MonoBehaviour
         runAction = InputSystem.actions.FindAction("Sprint");
     }
 
+    /// <summary>Unity message. Triggers a leap when jump is pressed while attached to a wall.</summary>
     private void Update()
     {
         if (IsActive && jumpAction != null && jumpAction.WasPressedThisFrame())
             Leap();
     }
 
+    /// <summary>Unity message. Steps the wall physics while attached, otherwise checks whether to attach.</summary>
     private void FixedUpdate()
     {
         if (IsActive) StepWall();
@@ -154,9 +171,10 @@ public class Wallrun : MonoBehaviour
     }
 
     /// <summary>
-    /// Call once per frame from your camera script and add the result to the camera's yaw (degrees).
-    /// It is nonzero while the wall run turns a corner, and eases out smoothly.
+    /// Gives the yaw the camera should turn this frame (degrees) to follow a wall-run corner. Call once per frame from a camera script
+    /// (see <c>CameraEffects</c>). The stored turn is eased out exponentially and limited by <see cref="maxCameraTurnRate"/>.
     /// </summary>
+    /// <returns>Degrees to add to the camera yaw this frame; zero when no turn is pending.</returns>
     public float ConsumeYawDelta()
     {
         float step = pendingYaw * (1f - Mathf.Exp(-cameraTurnSharpness * Time.deltaTime));
@@ -166,7 +184,10 @@ public class Wallrun : MonoBehaviour
         return step;
     }
 
-    /// <summary>Stops the wall state without touching velocity or player state. Used when swing/zip take over.</summary>
+    /// <summary>
+    /// Leaves the wall state without touching velocity or player state, and starts the re-attach delay.
+    /// Used when swinging or zipping takes over.
+    /// </summary>
     public void Cancel()
     {
         IsActive = false;
@@ -174,8 +195,14 @@ public class Wallrun : MonoBehaviour
         nextAttachTime = Time.time + reattachDelay;
     }
 
-    // Attach
+    // ------------------------------------------------------------------------------- Attach
 
+    /// <summary>
+    /// Checks whether to attach to a wall this physics step. Fast movement (with run held) probes ahead and to both sides and picks
+    /// Climbing (head-on, within <see cref="headOnAngle"/>) or Running (grounded players cannot start a run). Slow, grounded movement into a wall
+    /// within <see cref="crawlAttachDistance"/> starts Crawling. On success it sets the initial wall speed and state, then calls
+    /// <see cref="PlayerSwinging.BeginZipMomentum"/>. Does nothing during the re-attach delay, a swing or a zip.
+    /// </summary>
     private void TryAttach()
     {
         if (Time.time < nextAttachTime) return;
@@ -260,6 +287,11 @@ public class Wallrun : MonoBehaviour
         swinging.BeginZipMomentum();
     }
 
+    /// <summary>Sphere-casts from the player to find a wall. Rejects hits that start inside a collider and surfaces tilted more than <see cref="maxWallNormalY"/>.</summary>
+    /// <param name="dir">Direction to probe.</param>
+    /// <param name="distance">Maximum probe distance.</param>
+    /// <param name="hit">The hit information when a wall was found.</param>
+    /// <returns><c>true</c> if a valid wall was hit.</returns>
     private bool ProbeWall(Vector3 dir, float distance, out RaycastHit hit)
     {
         // hit.distance == 0 means the sphere started inside a collider, normal is meaningless then
@@ -269,8 +301,15 @@ public class Wallrun : MonoBehaviour
                && Mathf.Abs(hit.normal.y) <= maxWallNormalY;
     }
 
-    // while on wall
+    // ------------------------------------------------------------------------ While on wall
 
+    /// <summary>
+    /// Per-physics-step update while on a wall: cancels if swing or zip took over; releases if the run key (or, when crawling, any input) is gone;
+    /// tries inner corners; re-probes and smooths the wall normal; handles losing the wall (outer corner, or vaulting over the top with
+    /// <see cref="ledgeVaultSpeed"/>); builds the target wall velocity for the current mode with speed decay and downgrade to crawling;
+    /// drops the player if blocked for <see cref="stuckTime"/>; ends on reaching the ground; then steers velocity toward the target
+    /// (with extra steering just after a corner) while cancelling gravity.
+    /// </summary>
     private void StepWall()
     {
         float dt = Time.fixedDeltaTime;
@@ -281,7 +320,9 @@ public class Wallrun : MonoBehaviour
             Cancel();
             return;
         }
-        zip.consecutiveZips = 0;
+
+        if (zip != null)
+            zip.consecutiveZips = 0;
 
         Vector2 input;
         if (moveAction != null)
@@ -403,9 +444,13 @@ public class Wallrun : MonoBehaviour
         rb.AddForce(-Physics.gravity, ForceMode.Acceleration);
     }
 
-    // Corners
+    // ------------------------------------------------------------------------------- Corners
 
-    /// <summary>A wall ahead of the run (concave corner). Turn onto it, heading away from the old wall.</summary>
+    /// <summary>
+    /// Detects a concave corner (a wall right ahead while running). Requires a roughly head-on face that also exists above and below the player
+    /// (rejects pillars and balconies), then turns onto it, heading away from the old wall. Respects <see cref="cornerCooldown"/>.
+    /// </summary>
+    /// <returns><c>true</c> if the run switched to the new wall.</returns>
     private bool TryInnerCorner()
     {
         if (Time.time - lastCornerTime < cornerCooldown) return false;
@@ -426,7 +471,11 @@ public class Wallrun : MonoBehaviour
         return true;
     }
 
-    /// <summary>The wall ended (convex corner). Look around the edge for the wall that continues.</summary>
+    /// <summary>
+    /// Detects a convex corner after the wall ends: sphere-casts back around the edge for a wall that faces the direction of travel
+    /// and switches to it. Respects <see cref="cornerCooldown"/>.
+    /// </summary>
+    /// <returns><c>true</c> if the run switched to the wall around the corner.</returns>
     private bool TryOuterCorner()
     {
         if (Time.time - lastCornerTime < cornerCooldown) return false;
@@ -444,6 +493,12 @@ public class Wallrun : MonoBehaviour
         return true;
     }
 
+    /// <summary>
+    /// Makes <paramref name="newNormal"/> the current wall: computes the run direction along it (away from the old wall for inner corners,
+    /// around into it for outer corners) and starts the temporary high-steering window and corner cooldown.
+    /// </summary>
+    /// <param name="newNormal">Normal of the new wall.</param>
+    /// <param name="inner"><c>true</c> for a concave (inner) corner, <c>false</c> for a convex (outer) one.</param>
     private void SwitchWall(Vector3 newNormal, bool inner)
     {
         // Along the new wall, heading away from the old wall (inner) or around into it (outer).
@@ -458,6 +513,12 @@ public class Wallrun : MonoBehaviour
         lastCornerTime = Time.time;
     }
 
+    /// <summary>
+    /// Adds the horizontal heading change between two run directions to the pending camera yaw, scaled by <see cref="cameraFollow"/>.
+    /// Changes below <see cref="cameraDeadzone"/> are ignored to filter mesh noise.
+    /// </summary>
+    /// <param name="before">Run direction before the step.</param>
+    /// <param name="after">Run direction after the step.</param>
     private void AddCameraYaw(Vector3 before, Vector3 after)
     {
         Vector3 a = new Vector3(before.x, 0f, before.z);
@@ -468,8 +529,13 @@ public class Wallrun : MonoBehaviour
         pendingYaw += delta * cameraFollow;
     }
 
-    // leaving the wall
+    // ----------------------------------------------------------------------- Leaving the wall
 
+    /// <summary>
+    /// Jumps off the wall. Keeps part of the speed along the wall, adds push away from and up off the wall, redirects excessive upward speed
+    /// away from the wall, clamps to <see cref="maxExitSpeed"/> and marks the jump press as consumed. Running and climbing leaps earn combo
+    /// and drag relief; crawl leaps do not.
+    /// </summary>
     private void Leap()
     {
         Vector3 along = Vector3.ProjectOnPlane(rb.linearVelocity, wallNormal) * leapMomentumKeep;
@@ -490,7 +556,11 @@ public class Wallrun : MonoBehaviour
 
         EndWall(exit, wasFast ? leapComboGain : 0f, wasFast ? leapDragRelief : 0f);
     }
-    
+
+    /// <summary>Leaves the wall in the air, starts the re-attach delay and hands the exit velocity and rewards to <see cref="PlayerSwinging.EndZip"/>.</summary>
+    /// <param name="exitVelocity">Velocity to leave with.</param>
+    /// <param name="combo">Combo levels to award.</param>
+    /// <param name="dragRelief">Air drag reduction (0 to 1) for the flight that follows.</param>
     private void EndWall(Vector3 exitVelocity, float combo, float dragRelief)
     {
         IsActive = false;
@@ -499,7 +569,9 @@ public class Wallrun : MonoBehaviour
         swinging.EndZip(exitVelocity, combo, dragRelief);
     }
 
-    /// <summary>Stepping off onto the ground: hand control straight back to PlayerMovement.</summary>
+    /// <summary>
+    /// Steps off onto the ground: hands control straight back to <see cref="PlayerMovement"/> through <see cref="PlayerSwinging.EndWallOnGround"/>.
+    /// </summary>
     private void EndWallOnGround()
     {
         IsActive = false;
@@ -508,8 +580,12 @@ public class Wallrun : MonoBehaviour
         swinging.EndWallOnGround();
     }
 
-    // Input
+    // ---------------------------------------------------------------------------- Input
 
+    /// <summary>
+    /// Reads the move input as a horizontal direction relative to the camera.</summary>
+    /// <returns>A normalised direction, or <see cref="Vector3.zero"/> when there is no input.
+    /// </returns>
     private Vector3 GetInputDirection()
     {
         if (moveAction == null) return Vector3.zero;
