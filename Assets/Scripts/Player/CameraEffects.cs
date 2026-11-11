@@ -10,24 +10,26 @@ using UnityEngine;
 public class CameraEffects : MonoBehaviour
 {
     [Header("References")]
-    public Wallrun wallRun;
-    public PlayerSwinging swinging;
-    public CinemachineOrbitalFollow orbital;
-
-    [Header("Direction")]
-    public float yawDirection = 1f;
-    [Tooltip("+1 means a larger Vertical Axis value tilts the view down. -1 tilts it up instead.")]
-    public float pitchDirection = 1f;
+    [SerializeField]
+    private Wallrun wallRun;
+    [SerializeField]
+    private PlayerSwinging swinging;
+    [SerializeField]
+    private CinemachineOrbitalFollow orbital;
 
     [Header("Tilt")]
+    [SerializeField]
     [Tooltip("Degrees the view tilts down while diving.")]
-    public float diveTiltDown = 12f;
-    [Tooltip("Optional, 0 = off. Degrees the view tilts up while running straight up a wall.")]
-    public float climbTiltUp = 0f;
+    private float diveTiltDown = 12f;
+    [SerializeField]
+    [Tooltip("Degrees the view tilts up while running straight up a wall.")]
+    private float climbTiltUp = 0f;
+    [SerializeField]
     [Tooltip("Higher = the tilt arrives and leaves faster.")]
-    public float tiltSharpness = 6f;
-
-    private float pitchOffset; // degrees currently applied, positive = down, ngeative = up
+    private float tiltSharpness = 6f;
+    [SerializeField]
+    [Tooltip("Degrees currently applied, positive = down, ngeative = up")]
+    private float pitchOffset = 0f;
 
     /// <summary>Unity message. Subscribes to <c>TimeTrialManager.PlayerTeleported</c> so the camera follows teleports without a visible swoosh.</summary>
     private void OnEnable()
@@ -56,8 +58,6 @@ public class CameraEffects : MonoBehaviour
     /// </summary>
     private void Update()
     {
-        float dt = Time.deltaTime;
-
         float targetPitch = 0f;
         if (swinging != null && swinging.IsDiving)
             targetPitch += diveTiltDown;
@@ -65,25 +65,30 @@ public class CameraEffects : MonoBehaviour
             targetPitch -= climbTiltUp;
 
         // Apply the change in tilt each frame, so mouse look keeps working and nothing is overwritten.
-        float newOffset = Mathf.Lerp(pitchOffset, targetPitch, 1f - Mathf.Exp(-tiltSharpness * dt));
-        float pitchDelta = (newOffset - pitchOffset) * pitchDirection;
+        float newOffset = Mathf.Lerp(pitchOffset, targetPitch, 1f - Mathf.Exp(-tiltSharpness * Time.deltaTime));
+        float pitchDelta = (newOffset - pitchOffset);
         pitchOffset = newOffset;
-        float yawDelta = wallRun != null ? wallRun.ConsumeYawDelta() * yawDirection : 0f;
+
+        float yawDelta;
+        if (wallRun != null)
+        {
+            yawDelta = wallRun.ConsumeYawDelta();
+        }
+        else
+        {
+            yawDelta = 0f;
+        }
 
         if (!Mathf.Approximately(yawDelta, 0f))
         {
-            var h = orbital.HorizontalAxis;
-            float min = h.Range.x;
-            float max = h.Range.y;
-            h.Value = Mathf.Repeat(h.Value + yawDelta - min, max - min) + min;
-            orbital.HorizontalAxis = h;
+            float min = orbital.HorizontalAxis.Range.x;
+            float max = orbital.HorizontalAxis.Range.y;
+            orbital.HorizontalAxis.Value = Mathf.Repeat(orbital.HorizontalAxis.Value + yawDelta - min, max - min) + min;
         }
 
         if (!Mathf.Approximately(pitchDelta, 0f))
         {
-            var v = orbital.VerticalAxis;
-            v.Value = Mathf.Clamp(v.Value + pitchDelta, v.Range.x, v.Range.y);
-            orbital.VerticalAxis = v;
+            orbital.VerticalAxis.Value = Mathf.Clamp(orbital.VerticalAxis.Value + pitchDelta, orbital.VerticalAxis.Range.x, orbital.VerticalAxis.Range.y);
         }
     }
 }

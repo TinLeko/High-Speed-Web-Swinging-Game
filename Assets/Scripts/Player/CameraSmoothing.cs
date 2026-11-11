@@ -35,9 +35,9 @@ public class CameraSmoothing : MonoBehaviour
         float targetFov = Mathf.Lerp(minFov, maxFov, speedPercent);
         float targetRadius = Mathf.Lerp(minRadius, maxRadius, speedPercent);
 
-        var lens = camera.Lens;
-        lens.FieldOfView = Mathf.Lerp(lens.FieldOfView, targetFov, smoothingStep);
-        camera.Lens = lens;
+        var cameraLens = camera.Lens;
+        cameraLens.FieldOfView = Mathf.Lerp(cameraLens.FieldOfView, targetFov, smoothingStep);
+        camera.Lens = cameraLens;
 
         orbitalFollow.Radius = Mathf.Lerp(orbitalFollow.Radius, targetRadius, smoothingStep);
     }

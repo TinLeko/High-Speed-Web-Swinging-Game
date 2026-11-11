@@ -18,10 +18,10 @@ public class PlayerMovement : MonoBehaviour
     private float walkSpeed = 80f;
     private float sprintSpeed = 140f;
     private float swingSpeed = 120f;
-    public float airDrag = 0.3f;
-    public float airDragQuadratic = 0.025f;
-    public float postReleaseGravity = 10f;
-    public float fallGravity = 12f;
+    private float airDrag = 0.3f;
+    private float airDragQuadratic = 0.025f;
+    private float postReleaseGravity = 10f;
+    private float fallGravity = 12f;
 
     public Transform orientation;
 

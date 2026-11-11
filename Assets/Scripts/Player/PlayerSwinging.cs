@@ -764,9 +764,16 @@ public class PlayerSwinging : MonoBehaviour
         if (outward < 1f) return;
 
         Vector3 flat = new Vector3(velocity.x, 0f, velocity.z);
-        Vector3 forward = flat.sqrMagnitude > 1f
-            ? flat.normalized
-            : Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
+        Vector3 forward;
+
+        if (flat.sqrMagnitude > 1f)
+        {
+            forward = flat.normalized;
+        }
+        else
+        {
+            forward = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
+        }
 
         // Direction of the arc: forward and down, perpendicular to the rope.
         Vector3 tangent = Vector3.ProjectOnPlane(forward, ropeDir);
