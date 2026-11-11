@@ -51,7 +51,7 @@ public class PlayerSwinging : MonoBehaviour
     public float damper = 6f;
     public float reelSpeed = 3f;
     public float minRopeLength = 8f;
-    public float ropeShootSpeed = 200f; // visual only
+    public float ropeShootSpeed = 200f;
 
     [Header("Swing Feel")]
     public float extraGravity = 15f;
@@ -733,7 +733,7 @@ public class PlayerSwinging : MonoBehaviour
 
     /// <summary>Ends the dive and records its duration. Sets the carry timer so a swing started soon after still gets the dive bonus.</summary>
     /// <param name="keepCarry">If true, a swing started shortly after still gets the dive bonus.</param>
-    private void EndDive(bool keepCarry)
+    public void EndDive(bool keepCarry)
     {
         if (isDiving)
         {

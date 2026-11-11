@@ -15,22 +15,27 @@ public class PlayerMovement : MonoBehaviour
     [Header("Movement")]
     [SerializeField]
     private float moveSpeed;
-    private float walkSpeed = 80f;
-    private float sprintSpeed = 140f;
-    private float swingSpeed = 120f;
-    private float airDrag = 0.3f;
-    private float airDragQuadratic = 0.025f;
-    private float postReleaseGravity = 10f;
-    private float fallGravity = 12f;
-
-    public Transform orientation;
-
     [SerializeField]
-    Vector3 moveDirection;
+    private float walkSpeed = 80f;
+    [SerializeField]
+    private float sprintSpeed = 140f;
+    [SerializeField]
+    private float swingSpeed = 120f;
+    [SerializeField]
+    private float airDrag = 0.3f;
+    [SerializeField]
+    private float airDragQuadratic = 0.025f;
+    [SerializeField]
+    private float postReleaseGravity = 10f;
+    [SerializeField]
+    private float fallGravity = 12f;
+    [SerializeField]
+    private Transform orientation;
+    [SerializeField]
+    private Vector3 moveDirection;
+    private Rigidbody rigidBody;
 
-    Rigidbody rb;
-
-    public InputActionAsset inputActions;
+    private InputActionAsset inputActions;
     private InputAction moveAction;
     private InputAction jumpAction;
     private InputAction sprintAction;
@@ -39,26 +44,34 @@ public class PlayerMovement : MonoBehaviour
     public float playerHeight;
     public LayerMask groundMask;
     [SerializeField]
-    bool grounded;
+    private bool grounded;
     public float groundDrag;
 
     [Header("Jumping")]
     [SerializeField]
     private float currentJumpForce;
-    public float minJumpForce;
-    public float maxJumpForce;
-    public float jumpCooldown;
-    public float airMultiplier;
-    public bool canJump = true;
+    [SerializeField]
+    private float minJumpForce;
+    [SerializeField] 
+    private float maxJumpForce;
+    [SerializeField] 
+    private float jumpCooldown;
+    [SerializeField] 
+    private float airMultiplier;
+    [SerializeField]
+    private bool canJump = true;
     [SerializeField]
     private bool isCharging = false;
     [SerializeField]
     private float chargeRate = 12.5f;
 
     [Header("Slope Handling")]
-    public float maxSlopeAngle;
+    [SerializeField]
+    private float maxSlopeAngle;
     private RaycastHit slopeHit;
+    [SerializeField]
     private bool exitingSlope;
+    [SerializeField]
     private float slopeGravity = 80f;
 
     [Header("Landing Momentum")]
@@ -91,22 +104,6 @@ public class PlayerMovement : MonoBehaviour
     }
 
     /// <summary>
-    /// Unity message. Enables the "Player" input action map.
-    /// </summary>
-    private void OnEnable()
-    {
-        inputActions.FindActionMap("Player").Enable();
-    }
-
-    /// <summary>
-    /// Unity message. Disables the "Player" input action map.
-    /// </summary>
-    private void OnDisable()
-    {
-        inputActions.FindActionMap("Player").Disable();
-    }
-
-    /// <summary>
     /// Unity message. Looks up the input actions and caches 
     /// the <see cref="WebZip"/> and <see cref="PlayerSwinging"/> components.
     /// </summary>
@@ -126,8 +123,8 @@ public class PlayerMovement : MonoBehaviour
     /// </summary>
     void Start()
     {
-        rb = GetComponent<Rigidbody>();
-        rb.freezeRotation = true;
+        rigidBody = GetComponent<Rigidbody>();
+        rigidBody.freezeRotation = true;
         currentJumpForce = minJumpForce;
     }
 
@@ -149,20 +146,20 @@ public class PlayerMovement : MonoBehaviour
 
         if (OnSlope() && grounded && !exitingSlope)
         {
-            rb.AddForce(GetSlopeMoveDirection() * moveSpeed, ForceMode.Force);
-            if (rb.linearVelocity.y > 0)
+            rigidBody.AddForce(GetSlopeMoveDirection() * moveSpeed, ForceMode.Force);
+            if (rigidBody.linearVelocity.y > 0)
             {
-                rb.AddForce(Vector3.down * slopeGravity, ForceMode.Force);
+                rigidBody.AddForce(Vector3.down * slopeGravity, ForceMode.Force);
             }
         }
         else if (grounded && !OnSlope())
         {
-            rb.AddForce(moveDirection.normalized * moveSpeed, ForceMode.Force);
+            rigidBody.AddForce(moveDirection.normalized * moveSpeed, ForceMode.Force);
         }
         else
         {
-            rb.AddForce(moveDirection.normalized * moveSpeed * airMultiplier, ForceMode.Force);
-            AirDrag();
+            rigidBody.AddForce(moveDirection.normalized * moveSpeed * airMultiplier, ForceMode.Force);
+            ApplyAirDrag();
         }
     }
 
@@ -187,16 +184,14 @@ public class PlayerMovement : MonoBehaviour
     {
         JumpControl();
 
-        bool jumpReleased = jumpAction.WasReleasedThisFrame();
-
-        if (jumpReleased && canJump && grounded && !jumpConsumed)
+        if (jumpAction.WasReleasedThisFrame() && canJump && grounded && !jumpConsumed)
         {
             canJump = false;
             Jump();
             Invoke(nameof(ResetJump), jumpCooldown);
         }
 
-        if (jumpReleased)
+        if (jumpAction.WasReleasedThisFrame())
         {
             currentJumpForce = minJumpForce;
             jumpConsumed = false;
@@ -208,15 +203,14 @@ public class PlayerMovement : MonoBehaviour
         if (carryTimer > 0f) carryTimer -= Time.deltaTime;
 
         if (grounded && !swingMomentum)
-            rb.linearDamping = CurrentGroundDrag();
+            rigidBody.linearDamping = CurrentGroundDrag();
         else
-            rb.linearDamping = 0f;
+            rigidBody.linearDamping = 0f;
 
-        Vector2 input = moveAction.ReadValue<Vector2>();
-        moveDirection = orientation.forward * input.y + orientation.right * input.x;
+        moveDirection = orientation.forward * moveAction.ReadValue<Vector2>().y + orientation.right * moveAction.ReadValue<Vector2>().x;
         StateHandler();
 
-        rb.useGravity = swingMomentum || !(OnSlope() && grounded);
+        rigidBody.useGravity = swingMomentum || !(OnSlope() && grounded);
     }
 
     /// <summary>
@@ -229,23 +223,21 @@ public class PlayerMovement : MonoBehaviour
         if (swingMomentum)
             return;
 
-        float cap = CurrentSpeedCap();
-
         if (OnSlope() && !exitingSlope)
         {
-            if (rb.linearVelocity.magnitude > cap)
+            if (rigidBody.linearVelocity.magnitude > CurrentSpeedCap())
             {
-                rb.linearVelocity = rb.linearVelocity.normalized * cap;
+                rigidBody.linearVelocity = rigidBody.linearVelocity.normalized * CurrentSpeedCap();
             }
         }
         else
         {
-            Vector3 flatVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
-            if (flatVelocity.magnitude > cap)
+            Vector3 flatVelocity = new Vector3(rigidBody.linearVelocity.x, 0f, rigidBody.linearVelocity.z);
+            if (flatVelocity.magnitude > CurrentSpeedCap())
             {
-                Vector3 limited = flatVelocity.normalized * cap;
+                Vector3 flatVelocityCapped = flatVelocity.normalized * CurrentSpeedCap();
                 // Keeping the vertical velocity. Overwriting it with a flat vector kills jumps and falls.
-                rb.linearVelocity = new Vector3(limited.x, rb.linearVelocity.y, limited.z);
+                rigidBody.linearVelocity = new Vector3(flatVelocityCapped.x, rigidBody.linearVelocity.y, flatVelocityCapped.z);
             }
         }
     }
@@ -262,7 +254,6 @@ public class PlayerMovement : MonoBehaviour
         if (isCharging)
         {
             currentJumpForce += chargeRate * Time.deltaTime;
-
             currentJumpForce = Mathf.Clamp(currentJumpForce, minJumpForce, maxJumpForce);
         }
     }
@@ -273,8 +264,8 @@ public class PlayerMovement : MonoBehaviour
     private void Jump()
     {
         exitingSlope = true;
-        rb.linearVelocity = new Vector3(rb.linearVelocity.x, 0f, rb.linearVelocity.z);
-        rb.AddForce(transform.up * currentJumpForce, ForceMode.Impulse);
+        rigidBody.linearVelocity = new Vector3(rigidBody.linearVelocity.x, 0f, rigidBody.linearVelocity.z);
+        rigidBody.AddForce(transform.up * currentJumpForce, ForceMode.Impulse);
     }
 
     /// <summary>
@@ -320,8 +311,7 @@ public class PlayerMovement : MonoBehaviour
     {
         if (Physics.Raycast(transform.position, Vector3.down, out slopeHit, playerHeight * 0.5f + 0.3f))
         {
-            float angle = Vector3.Angle(Vector3.up, slopeHit.normal);
-            return angle < maxSlopeAngle && angle != 0f;
+            return Vector3.Angle(Vector3.up, slopeHit.normal) < maxSlopeAngle && Vector3.Angle(Vector3.up, slopeHit.normal) != 0f;
         }
 
         return false;
@@ -343,9 +333,9 @@ public class PlayerMovement : MonoBehaviour
     /// </summary>
     public void BeginLandingCarry()
     {
-        Vector3 v = rb.linearVelocity;
+        Vector3 v = rigidBody.linearVelocity;
         Vector3 flat = new Vector3(v.x, 0f, v.z) * landingSpeedKeep;
-        rb.linearVelocity = new Vector3(flat.x, v.y, flat.z);
+        rigidBody.linearVelocity = new Vector3(flat.x, v.y, flat.z);
         carryCap = flat.magnitude;
         carryTimer = carryDuration;
     }
@@ -356,7 +346,9 @@ public class PlayerMovement : MonoBehaviour
     /// <returns>The speed cap in m/s.</returns>
     private float CurrentSpeedCap()
     {
-        if (carryTimer <= 0f) return moveSpeed;
+        if (carryTimer <= 0f) 
+            return moveSpeed;
+
         return Mathf.Max(moveSpeed, Mathf.Lerp(moveSpeed, carryCap, carryTimer / carryDuration));
     }
 
@@ -366,30 +358,30 @@ public class PlayerMovement : MonoBehaviour
     /// </summary>
     private float CurrentGroundDrag()
     {
-        if (carryTimer <= 0f) return groundDrag;
-        float t = 1f - carryTimer / carryDuration; // 0 at landing, 1 when the carry ends
-        return Mathf.Lerp(groundDrag * carryDragRatio, groundDrag, t * t);
+        if (carryTimer <= 0f) 
+            return groundDrag;
+
+        return Mathf.Lerp(groundDrag * carryDragRatio, groundDrag, Mathf.Pow(1f - carryTimer / carryDuration, 2f));
     }
 
     /// <summary>
     /// Airborne handling: adds extra gravity (more while falling) and applies horizontal drag with a constant and a speed-squared-like term.
     /// Vertical velocity is untouched.
     /// </summary>
-    private void AirDrag()
+    private void ApplyAirDrag()
     {
-        float extra = postReleaseGravity;
-        if (rb.linearVelocity.y < 0f)
-            extra += fallGravity;
+        float extraGravity = postReleaseGravity;
+        if (rigidBody.linearVelocity.y < 0f)
+            extraGravity += fallGravity;
 
-        rb.AddForce(Vector3.down * extra, ForceMode.Acceleration);
+        rigidBody.AddForce(Vector3.down * extraGravity, ForceMode.Acceleration);
 
-        Vector3 velocity = rb.linearVelocity;
-        Vector3 horizontal = new Vector3(velocity.x, 0f, velocity.z);
-        float speed = horizontal.magnitude;
-        if (speed < 0.01f) return;
+        Vector3 horizontal = new Vector3(rigidBody.linearVelocity.x, 0f, rigidBody.linearVelocity.z);
 
-        float dragRate = airDrag + airDragQuadratic * speed;
-        horizontal *= 1f - Mathf.Clamp01(dragRate * Time.fixedDeltaTime);
-        rb.linearVelocity = new Vector3(horizontal.x, velocity.y, horizontal.z);
+        if (horizontal.magnitude < 0.01f)
+            return;
+
+        horizontal *= 1f - Mathf.Clamp01((airDrag + airDragQuadratic * horizontal.magnitude) * Time.fixedDeltaTime);
+        rigidBody.linearVelocity = new Vector3(horizontal.x, rigidBody.linearVelocity.y, horizontal.z);
     }
 }

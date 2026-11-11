@@ -10,26 +10,20 @@ using UnityEngine.InputSystem;
 /// </remarks>
 public class PlayerCamera : MonoBehaviour
 {
-    public InputActionAsset inputActions;
-    public InputAction lookAction;
-    public Transform orientation;
-    public Transform player;
-    public Transform playerObj;
-    public Rigidbody rb;
-    public float rotationSpeed;
-    public Wallrun wallRun;
-
-    /// <summary>Unity message. Enables the "Player" input action map.</summary>
-    private void OnEnable()
-    {
-        inputActions.FindActionMap("Player").Enable();
-    }
-
-    /// <summary>Unity message. Disables the "Player" input action map.</summary>
-    private void OnDisable()
-    {
-        inputActions.FindActionMap("Player").Disable();
-    }
+    private InputActionAsset inputActions;
+    private InputAction lookAction;
+    [SerializeField]
+    private Transform orientation;
+    [SerializeField]
+    private Transform player;
+    [SerializeField]
+    private Transform playerObj;
+    [SerializeField]
+    private Rigidbody rb;
+    [SerializeField]
+    private float rotationSpeed;
+    [SerializeField]
+    private Wallrun wallRun;
 
     /// <summary>Unity message. Looks up the "Look" input action.</summary>
     private void Awake()

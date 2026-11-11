@@ -8,20 +8,20 @@ using UnityEngine;
 public class CameraSmoothing : MonoBehaviour
 {
     [SerializeField]
-    CinemachineCamera camera;
+    private CinemachineCamera camera;
     [SerializeField]
-    CinemachineOrbitalFollow orbitalFollow;
+    private CinemachineOrbitalFollow orbitalFollow;
     [SerializeField]
-    Rigidbody target;
+    private Rigidbody target;
 
     [SerializeField]
-    float maxSpeed = 48f;
+    private float maxSpeed = 48f;
     [SerializeField]
-    float minFov = 75f, maxFov = 100f;
+    private float minFov = 75f, maxFov = 100f;
     [SerializeField]
-    float minRadius = 5f, maxRadius = 8f;
+    private float minRadius = 5f, maxRadius = 8f;
     [SerializeField]
-    float smoothing = 5f;
+    private float smoothing = 5f;
 
     /// <summary>
     /// Unity message. Maps the target's speed (relative to <c>maxSpeed</c>) to a field of view and an orbit radius, then eases the camera
@@ -35,10 +35,7 @@ public class CameraSmoothing : MonoBehaviour
         float targetFov = Mathf.Lerp(minFov, maxFov, speedPercent);
         float targetRadius = Mathf.Lerp(minRadius, maxRadius, speedPercent);
 
-        var cameraLens = camera.Lens;
-        cameraLens.FieldOfView = Mathf.Lerp(cameraLens.FieldOfView, targetFov, smoothingStep);
-        camera.Lens = cameraLens;
-
+        camera.Lens.FieldOfView = Mathf.Lerp(camera.Lens.FieldOfView, targetFov, smoothingStep);
         orbitalFollow.Radius = Mathf.Lerp(orbitalFollow.Radius, targetRadius, smoothingStep);
     }
 }
