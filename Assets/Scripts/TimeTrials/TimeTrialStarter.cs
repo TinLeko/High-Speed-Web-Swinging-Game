@@ -55,9 +55,12 @@ public class TimeTrialStarter : MonoBehaviour
     {
         get
         {
-            if (hoopPoints == null) return false;
+            if (hoopPoints == null) 
+                return false;
+
             foreach (Transform point in hoopPoints)
-                if (point != null) return true;
+                if (point != null) 
+                    return true;
             return false;
         }
     }
@@ -85,35 +88,44 @@ public class TimeTrialStarter : MonoBehaviour
     /// <returns>Gold, silver or bronze if the time is within the matching threshold, otherwise <see cref="TrialMedal.None"/>.</returns>
     public TrialMedal GetMedal(float time)
     {
-        if (time <= goldTime) return TrialMedal.Gold;
-        if (time <= silverTime) return TrialMedal.Silver;
-        if (time <= bronzeTime) return TrialMedal.Bronze;
+        if (time <= goldTime) 
+            return TrialMedal.Gold;
+
+        if (time <= silverTime) 
+            return TrialMedal.Silver;
+
+        if (time <= bronzeTime) 
+            return TrialMedal.Bronze;
+
         return TrialMedal.None;
     }
 
     /// <summary>Unity editor message (on adding the component). Makes the sphere collider a trigger with <see cref="triggerRadius"/>.</summary>
     private void Reset()
     {
-        var sphere = GetComponent<SphereCollider>();
-        sphere.isTrigger = true;
-        sphere.radius = triggerRadius;
+        var sphereCollider = GetComponent<SphereCollider>();
+        sphereCollider.isTrigger = true;
+        sphereCollider.radius = triggerRadius;
     }
 
     /// <summary>Unity message. Configures the trigger collider and builds the world marker if a prefab is assigned.</summary>
     private void Awake()
     {
-        var sphere = GetComponent<SphereCollider>();
-        sphere.isTrigger = true;
-        sphere.radius = triggerRadius;
+        var sphereCollider = GetComponent<SphereCollider>();
+        sphereCollider.isTrigger = true;
+        sphereCollider.radius = triggerRadius;
 
-        if (markerPrefab != null) BuildMarker();
+        if (markerPrefab != null) 
+            BuildMarker();
     }
 
     /// <summary>Unity message. Tells the <see cref="TimeTrialManager"/> when the player enters the trigger.</summary>
     /// <param name="other">The collider that entered.</param>
     private void OnTriggerEnter(Collider other)
     {
-        if (other.GetComponentInParent<PlayerSwinging>() == null) return;
+        if (other.GetComponentInParent<PlayerSwinging>() == null) 
+            return;
+
         if (TimeTrialManager.Instance != null)
             TimeTrialManager.Instance.OnPlayerEnteredStarter(this);
     }
@@ -122,7 +134,9 @@ public class TimeTrialStarter : MonoBehaviour
     /// <param name="other">The collider that left.</param>
     private void OnTriggerExit(Collider other)
     {
-        if (other.GetComponentInParent<PlayerSwinging>() == null) return;
+        if (other.GetComponentInParent<PlayerSwinging>() == null) 
+            return;
+
         if (TimeTrialManager.Instance != null)
             TimeTrialManager.Instance.OnPlayerLeftStarter(this);
     }

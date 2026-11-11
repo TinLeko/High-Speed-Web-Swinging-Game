@@ -54,7 +54,9 @@ public class TimeTrialUI : MonoBehaviour
     {
         hudRoot.SetActive(show);
         hintText.text = hint;
-        if (!show) toastText.gameObject.SetActive(false);
+
+        if (!show)
+            toastText.gameObject.SetActive(false);
     }
 
     public void SetHud(string time, string info)
@@ -73,7 +75,15 @@ public class TimeTrialUI : MonoBehaviour
 
         limitText.gameObject.SetActive(true);
         limitText.text = text;
-        limitText.color = urgent ? Urgent : Soft;
+
+        if (urgent)
+        {
+            limitText.color = Urgent;
+        }
+        else
+        {
+            limitText.color = Soft;
+        }
     }
 
     public void ShowMessage(string text, float seconds)

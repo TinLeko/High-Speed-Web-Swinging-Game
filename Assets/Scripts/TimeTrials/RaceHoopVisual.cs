@@ -13,11 +13,16 @@ using UnityEngine;
 public class RaceHoopVisual : MonoBehaviour
 {
     /// <summary>Visual state of the hoop.</summary>
-    public enum VisualState { Hidden, Preview, Active, Collected }
+    public enum VisualState 
+    { 
+        Hidden, 
+        Preview, 
+        Active, 
+        Collected 
+    }
 
     /// <summary>The current visual state.</summary>
     public VisualState StateNow { get; private set; } = VisualState.Hidden;
-
 
     private static readonly Color ActiveTint = new Color(0.4f, 0.95f, 1f, 1f);
     private static readonly Color PreviewTint = new Color(0.55f, 0.55f, 0.55f, 1f);
@@ -86,9 +91,15 @@ public class RaceHoopVisual : MonoBehaviour
         if (renderers == null) return;
         switch (state)
         {
-            case VisualState.Active:    RaceModelUtils.Tint(renderers, ActiveTint, tintProperty); break;
-            case VisualState.Preview:   RaceModelUtils.Tint(renderers, PreviewTint, tintProperty); break;
-            case VisualState.Collected: RaceModelUtils.Tint(renderers, PassedTint, tintProperty); break;
+            case VisualState.Active: 
+                RaceModelUtils.Tint(renderers, ActiveTint, tintProperty); 
+                break;
+            case VisualState.Preview: 
+                RaceModelUtils.Tint(renderers, PreviewTint, tintProperty); 
+                break;
+            case VisualState.Collected: 
+                RaceModelUtils.Tint(renderers, PassedTint, tintProperty); 
+                break;
         }
     }
 
@@ -111,9 +122,9 @@ public class RaceHoopVisual : MonoBehaviour
                 break;
 
             case VisualState.Collected:
-                float k = Mathf.Clamp01(stateTime / 0.35f);
-                holder.localScale = Vector3.one * (Mathf.Lerp(1f, 1.6f, k) * (1f - k * k));
-                if (k >= 1f) Destroy(gameObject);
+                float kFactor = Mathf.Clamp01(stateTime / 0.35f);
+                holder.localScale = Vector3.one * (Mathf.Lerp(1f, 1.6f, kFactor) * (1f - kFactor * kFactor));
+                if (kFactor >= 1f) Destroy(gameObject);
                 break;
         }
     }

@@ -16,21 +16,23 @@ public class RaceNavigationArrow : MonoBehaviour
     private bool shown;
 
     /// <summary>Creates the arrow model (replacing any previous one), removes its colliders and keeps it hidden until a target is set.</summary>
-    /// <param name="prefab">The arrow model; null means no arrow is shown.</param>
-    /// <param name="scale">Scale multiplier for the model.</param>
+    /// <param name="arrowPrefab">The arrow model; null means no arrow is shown.</param>
+    /// <param name="arrowScale">Scale multiplier for the model.</param>
     /// <param name="arrowHeight">Height above the followed object.</param>
-    public void Setup(GameObject prefab, float scale, float arrowHeight)
+    public void Setup(GameObject arrowPrefab, float arrowScale, float arrowHeight)
     {
         height = arrowHeight;
-        if (modelRoot != null) Destroy(modelRoot);
+        if (modelRoot != null)
+            Destroy(modelRoot);
         modelRoot = null;
         shown = false;
 
-        if (prefab == null) return;
+        if (arrowPrefab == null) 
+            return;
 
-        modelRoot = Instantiate(prefab, transform);
+        modelRoot = Instantiate(arrowPrefab, transform);
         RaceModelUtils.StripColliders(modelRoot);
-        modelRoot.transform.localScale *= scale;
+        modelRoot.transform.localScale *= arrowScale;
         modelRoot.SetActive(false);
     }
 
@@ -53,7 +55,9 @@ public class RaceNavigationArrow : MonoBehaviour
     /// <param name="show">Whether the model should be visible.</param>
     private void SetShown(bool show)
     {
-        if (modelRoot == null || shown == show) return;
+        if (modelRoot == null || shown == show) 
+            return;
+
         shown = show;
         modelRoot.SetActive(show);
     }
@@ -71,10 +75,10 @@ public class RaceNavigationArrow : MonoBehaviour
 
         SetShown(true);
 
-        Vector3 position = follow.position + Vector3.up * (height + Mathf.Sin(Time.time * 3f) * 0.1f);
-        transform.position = position;
+        Vector3 arrowPosition = follow.position + Vector3.up * (height + Mathf.Sin(Time.time * 3f) * 0.1f);
+        transform.position = arrowPosition;
 
-        Vector3 toTarget = targetPoint - position;
+        Vector3 toTarget = targetPoint - arrowPosition;
         if (toTarget.sqrMagnitude < 0.01f) return;
 
         Quaternion wanted = Quaternion.LookRotation(toTarget.normalized, Vector3.up);

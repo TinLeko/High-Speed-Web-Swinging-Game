@@ -31,16 +31,20 @@ public static class RaceModelUtils
 
         foreach (MeshFilter meshFilter in root.GetComponentsInChildren<MeshFilter>(true))
         {
-            if (meshFilter.sharedMesh == null) continue;
+            if (meshFilter.sharedMesh == null) 
+                continue;
 
             Bounds meshBounds = meshFilter.sharedMesh.bounds;
             for (int i = 0; i < 8; i++)
             {
                 Vector3 sign = new Vector3((i & 1) == 0 ? -1f : 1f, (i & 2) == 0 ? -1f : 1f, (i & 4) == 0 ? -1f : 1f);
-                Vector3 corner = meshBounds.center + Vector3.Scale(meshBounds.extents, sign);
-                Vector3 local = root.InverseTransformPoint(meshFilter.transform.TransformPoint(corner));
+                Vector3 local = root.InverseTransformPoint(meshFilter.transform.TransformPoint(meshBounds.center + Vector3.Scale(meshBounds.extents, sign)));
 
-                if (!any) { bounds = new Bounds(local, Vector3.zero); any = true; }
+                if (!any)
+                { 
+                    bounds = new Bounds(local, Vector3.zero);
+                    any = true;
+                }
                 else bounds.Encapsulate(local);
             }
         }
@@ -57,15 +61,20 @@ public static class RaceModelUtils
     /// <param name="extraProperty">Name of an additional shader colour property, or empty.</param>
     public static void Tint(Renderer[] renderers, Color color, string extraProperty = "")
     {
-        var block = new MaterialPropertyBlock();
+        var materialPropertyBlock = new MaterialPropertyBlock();
         foreach (Renderer renderer in renderers)
         {
-            if (renderer == null) continue;
-            renderer.GetPropertyBlock(block);
-            block.SetColor(BaseColorId, color);
-            block.SetColor(ColorId, color);
-            if (!string.IsNullOrEmpty(extraProperty)) block.SetColor(Shader.PropertyToID(extraProperty), color);
-            renderer.SetPropertyBlock(block);
+            if (renderer == null) 
+                continue;
+
+            renderer.GetPropertyBlock(materialPropertyBlock);
+            materialPropertyBlock.SetColor(BaseColorId, color);
+            materialPropertyBlock.SetColor(ColorId, color);
+
+            if (!string.IsNullOrEmpty(extraProperty)) 
+                materialPropertyBlock.SetColor(Shader.PropertyToID(extraProperty), color);
+
+            renderer.SetPropertyBlock(materialPropertyBlock);
         }
     }
 }

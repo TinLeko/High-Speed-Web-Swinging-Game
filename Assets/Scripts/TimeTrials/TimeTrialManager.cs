@@ -112,15 +112,22 @@ public class TimeTrialManager : MonoBehaviour
         Instance = this;
 
         playerSwinging = FindAnyObjectByType<PlayerSwinging>();
-        if (playerRb == null && playerSwinging != null) playerRb = playerSwinging.GetComponent<Rigidbody>();
 
-        if (playerSwinging == null) playerSwinging = playerRb.GetComponent<PlayerSwinging>();
+        if (playerRb == null && playerSwinging != null) 
+            playerRb = playerSwinging.GetComponent<Rigidbody>();
+
+        if (playerSwinging == null) 
+            playerSwinging = playerRb.GetComponent<PlayerSwinging>();
+
         wallRun = playerRb.GetComponent<Wallrun>();
         webZip = playerRb.GetComponent<WebZip>();
         
 
-        if (ui == null) ui = FindAnyObjectByType<TimeTrialUI>();
-        if (ui == null) ui = new GameObject("TimeTrialUI").AddComponent<TimeTrialUI>();
+        if (ui == null)
+            ui = FindAnyObjectByType<TimeTrialUI>();
+
+        if (ui == null)
+            ui = new GameObject("TimeTrialUI").AddComponent<TimeTrialUI>();
 
         arrow = new GameObject("RaceNavigationArrow").AddComponent<RaceNavigationArrow>();
         arrow.Setup(arrowPrefab, arrowScale, arrowHeight);
@@ -134,7 +141,8 @@ public class TimeTrialManager : MonoBehaviour
     /// <summary>Unity message. Clears <see cref="Instance"/> if this was the active manager.</summary>
     private void OnDestroy()
     {
-        if (Instance == this) Instance = null;
+        if (Instance == this) 
+            Instance = null;
     }
 
     /// <summary>Finds an input action by name in the project-wide actions.</summary>
@@ -160,7 +168,9 @@ public class TimeTrialManager : MonoBehaviour
     /// <returns><c>true</c> if pressed this frame.</returns>
     private static bool Pressed(InputAction action, Key fallback)
     {
-        if (action != null) return action.WasPressedThisFrame();
+        if (action != null) 
+            return action.WasPressedThisFrame();
+
         return Keyboard.current != null && Keyboard.current[fallback].wasPressedThisFrame;
     }
 
@@ -170,7 +180,8 @@ public class TimeTrialManager : MonoBehaviour
     /// <param name="starter">The starter that was touched.</param>
     public void OnPlayerEnteredStarter(TimeTrialStarter starter)
     {
-        if (CurrentState != State.Idle) return;
+        if (CurrentState != State.Idle) 
+            return;
 
         promptStarter = starter;
         CurrentState = State.Prompt;
@@ -196,27 +207,51 @@ public class TimeTrialManager : MonoBehaviour
         switch (CurrentState)
         {
             case State.Prompt:
-                if (ConfirmPressed) StartRace(promptStarter);
-                else if (CancelPressed) ClosePrompt();
+                if (ConfirmPressed) 
+                    StartRace(promptStarter);
+                else if (CancelPressed) 
+                    ClosePrompt();
                 break;
 
             case State.Countdown:
-                if (CancelPressed) { AbortRace(); break; }
+                if (CancelPressed) 
+                { 
+                    AbortRace(); 
+                    break; 
+                }
                 countdownTimer -= Time.deltaTime;
-                if (countdownTimer <= 0f) BeginRacing();
-                else ui.ShowCountdown(Mathf.CeilToInt(countdownTimer).ToString());
+
+                if (countdownTimer <= 0f) 
+                    BeginRacing();
+                else 
+                    ui.ShowCountdown(Mathf.CeilToInt(countdownTimer).ToString());
                 break;
 
             case State.Racing:
-                if (CancelPressed) { AbortRace(); break; }
-                if (RespawnPressed) TryRespawn();
-                if (activeLimit > 0f && Elapsed >= activeLimit) { FailRace(); break; }
+                if (CancelPressed) 
+                { 
+                    AbortRace(); 
+                    break; 
+                }
+
+                if (RespawnPressed) 
+                    TryRespawn();
+
+                if (activeLimit > 0f && Elapsed >= activeLimit)
+                { 
+                    FailRace(); 
+                    break; 
+                }
+
                 UpdateHud();
                 break;
 
             case State.Results:
-                if (ConfirmPressed) RestartRace(currentStarter);   // retry
-                else if (CancelPressed) CloseResults();
+                if (ConfirmPressed) 
+                    RestartRace(currentStarter);   // retry
+                else if (CancelPressed) 
+                    CloseResults();
+
                 break;
         }
     }
@@ -227,7 +262,8 @@ public class TimeTrialManager : MonoBehaviour
     /// </summary>
     private void FixedUpdate()
     {
-        if (CurrentState != State.Racing || playerRb == null) return;
+        if (CurrentState != State.Racing || playerRb == null) 
+            return;
 
         if (justRespawned)
         {
@@ -239,10 +275,10 @@ public class TimeTrialManager : MonoBehaviour
         // Top speed: full 3D speed, sampled every physics step.
         topSpeed = Mathf.Max(topSpeed, playerRb.linearVelocity.magnitude);
 
-        Vector3 current = playerRb.position;
-        if (CrossedHoop(previousPosition, current, hoops[nextIndex]))
+        Vector3 currentRbPosition = playerRb.position;
+        if (CrossedHoop(previousPosition, currentRbPosition, hoops[nextIndex]))
             OnHoopPassed();
-        previousPosition = current;
+        previousPosition = currentRbPosition;
     }
 
     /// <summary>Dismisses the start prompt and returns to idle.</summary>
@@ -268,7 +304,8 @@ public class TimeTrialManager : MonoBehaviour
     /// <param name="starter">The starter defining the course, limit and respawn rules.</param>
     private void StartRace(TimeTrialStarter starter)
     {
-        if (starter == null || playerRb == null) return;
+        if (starter == null || playerRb == null) 
+            return;
 
         if (!starter.HasValidCourse)
         {
@@ -358,19 +395,32 @@ public class TimeTrialManager : MonoBehaviour
         float previousBest = PlayerPrefs.GetFloat(bestKey, 0f);
         bool newRecord = previousBest <= 0f || time < previousBest;
         float best = newRecord ? time : previousBest;
-        if (newRecord) PlayerPrefs.SetFloat(bestKey, time);
+
+        if (newRecord)
+            PlayerPrefs.SetFloat(bestKey, time);
 
         string medalKey = BestMedalKey(starter.trialId);
-        if ((int)medal > PlayerPrefs.GetInt(medalKey, 0)) PlayerPrefs.SetInt(medalKey, (int)medal);
+
+        if ((int)medal > PlayerPrefs.GetInt(medalKey, 0))
+            PlayerPrefs.SetInt(medalKey, (int)medal);
+
         PlayerPrefs.Save();
 
         string nextGoal;
         switch (medal)
         {
-            case TrialMedal.Gold:   nextGoal = "You earned the top medal!"; break;
-            case TrialMedal.Silver: nextGoal = "Gold: under " + FormatTime(starter.goldTime); break;
-            case TrialMedal.Bronze: nextGoal = "Silver: under " + FormatTime(starter.silverTime); break;
-            default:                nextGoal = "Bronze: under " + FormatTime(starter.bronzeTime); break;
+            case TrialMedal.Gold:
+                nextGoal = "You earned the top medal!";
+                break;
+            case TrialMedal.Silver: 
+                nextGoal = "Gold: under " + FormatTime(starter.goldTime);
+                break;
+            case TrialMedal.Bronze:
+                nextGoal = "Silver: under " + FormatTime(starter.silverTime);
+                break;
+            default:
+                nextGoal = "Bronze: under " + FormatTime(starter.bronzeTime);
+                break;
         }
 
         string medalName = medal == TrialMedal.None ? "NO MEDAL" : medal.ToString().ToUpperInvariant() + " MEDAL";
@@ -428,7 +478,9 @@ public class TimeTrialManager : MonoBehaviour
     /// <returns>The summary, or an empty string if the player never respawned.</returns>
     private string RespawnSummary()
     {
-        if (respawnCount == 0) return "";
+        if (respawnCount == 0) 
+            return "";
+
         return "Respawns  " + respawnCount + "  (+" + Num(penaltyTotal, "0.0") + " s)";
     }
 
@@ -441,7 +493,10 @@ public class TimeTrialManager : MonoBehaviour
     private void TryRespawn()
     {
         TimeTrialStarter starter = currentStarter;
-        if (starter == null || !starter.allowRespawn || Time.time < nextRespawnTime) return;
+
+        if (starter == null || !starter.allowRespawn || Time.time < nextRespawnTime) 
+            return;
+
         nextRespawnTime = Time.time + respawnCooldown;
 
         int checkpoint = nextIndex - 1; // last hoop you passed, -1 is none
@@ -516,7 +571,8 @@ public class TimeTrialManager : MonoBehaviour
 
         foreach (Transform point in starter.hoopPoints)
         {
-            if (point == null) continue;
+            if (point == null)
+                continue;
 
             float radius = starter.hoopRadius * Mathf.Max(0.01f, point.lossyScale.x);
             hoops.Add(new HoopData { position = point.position, rotation = point.rotation, radius = radius });
@@ -548,16 +604,20 @@ public class TimeTrialManager : MonoBehaviour
         for (int i=0; i < hoopVisuals.Count; i++)
         {
             RaceHoopVisual visual = hoopVisuals[i];
-            if (visual == null) continue;
+            if (visual == null) 
+                continue;
 
             if (i < nextIndex)
             {
                 if (visual.StateNow != RaceHoopVisual.VisualState.Collected)
                     visual.SetState(RaceHoopVisual.VisualState.Collected);
             }
-            else if (i == nextIndex) visual.SetState(RaceHoopVisual.VisualState.Active);
-            else if (i == nextIndex + 1) visual.SetState(RaceHoopVisual.VisualState.Preview);
-            else visual.SetState(RaceHoopVisual.VisualState.Hidden);
+            else if (i == nextIndex) 
+                visual.SetState(RaceHoopVisual.VisualState.Active);
+            else if (i == nextIndex + 1) 
+                visual.SetState(RaceHoopVisual.VisualState.Preview);
+            else 
+                visual.SetState(RaceHoopVisual.VisualState.Hidden);
         }
 
         if (nextIndex < hoops.Count)
@@ -575,14 +635,18 @@ public class TimeTrialManager : MonoBehaviour
     private bool CrossedHoop(Vector3 from, Vector3 to, HoopData hoop)
     {
         Vector3 normal = hoop.rotation * Vector3.forward;
-        float d0 = Vector3.Dot(from - hoop.position, normal);
-        float d1 = Vector3.Dot(to - hoop.position, normal);
+        float dot1 = Vector3.Dot(from - hoop.position, normal);
+        float dot2 = Vector3.Dot(to - hoop.position, normal);
 
-        if (d0 * d1 > 0f) return false;
+        if (dot1 * dot2 > 0f) 
+            return false;
 
         Vector3 crossing;
-        if (Mathf.Approximately(d0, d1)) crossing = to;
-        else crossing = Vector3.Lerp(from, to, d0 / (d0 - d1));
+
+        if (Mathf.Approximately(dot1, dot2)) 
+            crossing = to;
+        else 
+            crossing = Vector3.Lerp(from, to, dot1 / (dot1 - dot2));
 
         return Vector3.Distance(crossing, hoop.position) <= hoop.radius + passPadding;
     }
@@ -593,8 +657,7 @@ public class TimeTrialManager : MonoBehaviour
     private void UpdateHud()
     {
         float elapsed = Elapsed;
-        Vector3 hoopPosition = hoops[nextIndex].position;
-        float distance = Vector3.Distance(playerRb.position, hoopPosition);
+        float distance = Vector3.Distance(playerRb.position, hoops[nextIndex].position);
         float speed = playerRb.linearVelocity.magnitude;
 
         ui.SetHud(FormatTime(elapsed), "HOOP " + (nextIndex + 1) + "/" + hoops.Count + "   |   " + Num(distance, "0") + " m");
@@ -611,16 +674,29 @@ public class TimeTrialManager : MonoBehaviour
     /// <returns>The multi-line prompt text.</returns>
     private string BuildPromptBody(TimeTrialStarter starter)
     {
-        float best = PlayerPrefs.GetFloat(BestTimeKey(starter.trialId), 0f);
-        string bestLine = best > 0f ? "Your best: " + FormatTime(best) : "No time set yet";
+        float personalBest = PlayerPrefs.GetFloat(BestTimeKey(starter.trialId), 0f);
 
-        var rules = new List<string>();
-        if (starter.timeLimit > 0f) rules.Add("Time limit " + FormatTime(starter.timeLimit));
-        if (!starter.allowRespawn) rules.Add("No respawns");
-        else if (starter.respawnPenalty > 0f) rules.Add("Respawn [" + respawnKey + "]  +" + Num(starter.respawnPenalty, "0.#") + " s");
-        else rules.Add("Respawn [" + respawnKey + "]  free");
+        string bestTimeLine;
+        if (personalBest > 0f)
+        {
+            bestTimeLine = "Your best: " + FormatTime(personalBest);
+        }
+        else
+        {
+            bestTimeLine = "No time set yet";
+        }
 
-        return bestLine + "\n" + "Gold " + FormatTime(starter.goldTime) + "     Silver " + FormatTime(starter.silverTime) + "     Bronze " + FormatTime(starter.bronzeTime) + "\n" + string.Join("     ", rules) + "\n\n" +
+        var rulesToShow = new List<string>();
+        if (starter.timeLimit > 0f)
+            rulesToShow.Add("Time limit " + FormatTime(starter.timeLimit));
+        if (!starter.allowRespawn)
+            rulesToShow.Add("No respawns");
+        else if (starter.respawnPenalty > 0f)
+            rulesToShow.Add("Respawn [" + respawnKey + "]  +" + Num(starter.respawnPenalty, "0.#") + " s");
+        else 
+            rulesToShow.Add("Respawn [" + respawnKey + "]  free");
+
+        return bestTimeLine + "\n" + "Gold " + FormatTime(starter.goldTime) + "     Silver " + FormatTime(starter.silverTime) + "     Bronze " + FormatTime(starter.bronzeTime) + "\n" + string.Join("     ", rulesToShow) + "\n\n" +
                "Start the race?\n" + "[" + confirmKey + "] Yes          [" + cancelKey + "] No";
     }
 
@@ -643,10 +719,14 @@ public class TimeTrialManager : MonoBehaviour
     {
         switch (medal)
         {
-            case TrialMedal.Gold:   return new Color(1f, 0.84f, 0f, 1f);
-            case TrialMedal.Silver: return new Color(0.8f, 0.84f, 0.9f, 1f);
-            case TrialMedal.Bronze: return new Color(0.82f, 0.5f, 0.2f, 1f);
-            default:                return new Color(0.7f, 0.7f, 0.7f, 1f);
+            case TrialMedal.Gold:
+                return new Color(1f, 0.84f, 0f, 1f);
+            case TrialMedal.Silver:
+                return new Color(0.8f, 0.84f, 0.9f, 1f);
+            case TrialMedal.Bronze:
+                return new Color(0.82f, 0.5f, 0.2f, 1f);
+            default:
+                return new Color(0.7f, 0.7f, 0.7f, 1f);
         }
     }
 
