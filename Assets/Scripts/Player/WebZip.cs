@@ -53,7 +53,7 @@ public class WebZip : MonoBehaviour
 
     public bool IsZipping { get; private set; }
 
-    private Rigidbody rb;
+    private Rigidbody rigidBody;
     private PlayerSwinging swinging;
     private PlayerMovement movement;
     private InputAction zipAction;
@@ -89,7 +89,7 @@ public class WebZip : MonoBehaviour
     /// </summary>
     private void Awake()
     {
-        rb = GetComponent<Rigidbody>();
+        rigidBody = GetComponent<Rigidbody>();
         swinging = GetComponent<PlayerSwinging>();
         movement = GetComponent<PlayerMovement>();
         zipAction = InputSystem.actions.FindAction("Zip");
@@ -126,7 +126,7 @@ public class WebZip : MonoBehaviour
     {
         if (!IsZipping) return;
 
-        Vector3 toTarget = target - rb.position;
+        Vector3 toTarget = target - rigidBody.position;
         float dist = toTarget.magnitude;
 
         bool arrived = dist <= arriveDistance;
@@ -142,11 +142,11 @@ public class WebZip : MonoBehaviour
         zipSpeed = Mathf.Min(zipSpeed + zipAcceleration * Time.fixedDeltaTime, zipTopSpeed);
 
         // Bend velocity toward the target rather than replacing it, so the pull has weight.
-        rb.linearVelocity = Vector3.MoveTowards(
-            rb.linearVelocity, dir * zipSpeed, steerAcceleration * Time.fixedDeltaTime);
+        rigidBody.linearVelocity = Vector3.MoveTowards(
+            rigidBody.linearVelocity, dir * zipSpeed, steerAcceleration * Time.fixedDeltaTime);
 
         // PlayerMovement re-enables gravity every frame while swingMomentum is set, so cancelling it here.
-        rb.AddForce(-Physics.gravity, ForceMode.Acceleration);
+        rigidBody.AddForce(-Physics.gravity, ForceMode.Acceleration);
     }
 
     /// <summary>
@@ -246,8 +246,8 @@ public class WebZip : MonoBehaviour
         swinging.CancelSwingForZip();
         swinging.BeginZipMomentum();
 
-        launchDir = (target - rb.position).normalized;
-        zipSpeed = Mathf.Max(zipStartSpeed, Vector3.Dot(rb.linearVelocity, launchDir));
+        launchDir = (target - rigidBody.position).normalized;
+        zipSpeed = Mathf.Max(zipStartSpeed, Vector3.Dot(rigidBody.linearVelocity, launchDir));
 
         lineEnd = webTip.position;
         zipLine.positionCount = 2;
@@ -264,14 +264,22 @@ public class WebZip : MonoBehaviour
         nextZipTime = Time.time + cooldown;
         zipLine.positionCount = 0;
 
-        Vector3 velocity = rb.linearVelocity;
-        float speed = velocity.magnitude;
-        Vector3 dir = speed > 0.1f ? velocity / speed : launchDir;
+        float speed = rigidBody.linearVelocity.magnitude;
 
-        dir = (dir + Vector3.up * exitUpBias).normalized;
+        Vector3 direction;
+        if (speed > 0.1f)
+        {
+            direction = rigidBody.linearVelocity / speed;
+        }
+        else
+        {
+            direction = launchDir;
+        }
+
+        direction = (direction + Vector3.up * exitUpBias).normalized;
         speed = Mathf.Min(speed + exitSpeedBonus, maxExitSpeed);
 
-        Vector3 exitVelocity = dir * speed / consecutiveZips;
+        Vector3 exitVelocity = direction * speed / consecutiveZips;
 
         swinging.EndZip(exitVelocity, comboGain, dragRelief);
     }

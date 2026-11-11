@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
+using static UnityEditor.Searcher.SearcherWindow.Alignment;
 
 /// <summary>
 /// The core of the game and its largest script. It handles:
@@ -20,8 +21,8 @@ using UnityEngine.Serialization;
 /// </remarks>
 public class PlayerSwinging : MonoBehaviour
 {
-    public InputActionAsset inputActions;
-    public InputAction swingAction;
+    private InputActionAsset inputActions;
+    private InputAction swingAction;
     private InputAction moveAction;
     private InputAction jumpAction;
     private InputAction diveAction;
@@ -168,9 +169,9 @@ public class PlayerSwinging : MonoBehaviour
     /// <summary>Multiplier (1 to <see cref="maxPowerMultiplier"/>) that scales reeling, gravity and steering with the combo.</summary>
     private float Power => Mathf.Lerp(1f, maxPowerMultiplier, ComboT);
 
-    private Rigidbody rb;
+    private Rigidbody rigidBody;
     private PlayerMovement playerMovement;
-    private SpringJoint joint;
+    private SpringJoint springJoint;
     private Vector3 swingPoint;
     private Vector3 currentGrapplePosition;
     private int swingSide = 1;
@@ -202,19 +203,7 @@ public class PlayerSwinging : MonoBehaviour
     private bool OnWall => wall != null && wall.IsActive;
 
     /// <summary>True while a zip or wall run owns the player's movement.</summary>
-    private bool Busy => Zipping || OnWall;
-
-    /// <summary>Unity message. Enables the "Player" input action map.</summary>
-    private void OnEnable()
-    {
-        inputActions.FindActionMap("Player").Enable();
-    }
-
-    /// <summary>Unity message. Disables the "Player" input action map.</summary>
-    private void OnDisable()
-    {
-        inputActions.FindActionMap("Player").Disable();
-    }
+    private bool isBusy => Zipping || OnWall;
 
     /// <summary>Unity message. Looks up the input actions and caches sibling components.</summary>
     private void Awake()
@@ -225,7 +214,7 @@ public class PlayerSwinging : MonoBehaviour
         diveAction = InputSystem.actions.FindAction("Dive");
         playerMovement = GetComponent<PlayerMovement>();
         zip = GetComponent<WebZip>();
-        rb = GetComponent<Rigidbody>();
+        rigidBody = GetComponent<Rigidbody>();
         wall = GetComponent<Wallrun>();
     }
 
@@ -239,19 +228,20 @@ public class PlayerSwinging : MonoBehaviour
         // Jumping during a swing cuts the web and launches you.
         if (jumpAction != null && jumpAction.WasPressedThisFrame())
         {
-            if (joint != null)
+            if (springJoint != null)
             {
                 wantsSwing = false; // press swing again to re-attach
                 ReleaseWeb(true);
                 return;
             }
 
-            if (CanAirJump() && !Busy)
+            if (CanAirJump() && !isBusy)
                 AirJump();
         }
 
         if (DivePressedThisFrame && CanDive())
             StartDive();
+
         if (swingAction != null && swingAction.WasPressedThisFrame())
         {
             wantsSwing = true;
@@ -263,7 +253,7 @@ public class PlayerSwinging : MonoBehaviour
             ReleaseWeb(false);
         }
 
-        if (wantsSwing && joint == null && Time.time >= nextRetryTime)
+        if (wantsSwing && springJoint == null && Time.time >= nextRetryTime)
         {
             StartSwing();
             nextRetryTime = Time.time + retryInterval;
@@ -279,8 +269,11 @@ public class PlayerSwinging : MonoBehaviour
     {
         if (swingSpeedCap > CurrentMaxSpeed)
             swingSpeedCap = Mathf.Max(CurrentMaxSpeed, swingSpeedCap - diveCapDecay * Time.fixedDeltaTime);
-        if (Busy) return;
-        if (joint != null)
+
+        if (isBusy) 
+            return;
+
+        if (springJoint != null)
         {
             SwingPhysics();
             return;
@@ -302,13 +295,11 @@ public class PlayerSwinging : MonoBehaviour
             ApplyAirDrag();
         }
 
-        bool landed = playerMovement.IsGrounded && Time.time - lastReleaseTime > 0.25f;
-        if (landed && (airborneAfterSwing || comboLevel > 0 || playerMovement.swingMomentum))
+        if ((playerMovement.IsGrounded && Time.time - lastReleaseTime > 0.25f) && (airborneAfterSwing || comboLevel > 0 || playerMovement.swingMomentum))
         {
             LandWithMomentum();
         }
-        else if (!isDiving && comboLevel > 0f
-                 && Time.time - Mathf.Max(lastReleaseTime, lastDiveTime) > comboWindow)
+        else if (!isDiving && comboLevel > 0f && Time.time - Mathf.Max(lastReleaseTime, lastDiveTime) > comboWindow)
         {
             comboLevel = 0f;
         }
@@ -329,7 +320,7 @@ public class PlayerSwinging : MonoBehaviour
     private void StartSwing()
     {
         if (Zipping) return;
-        if (joint != null) return;
+        if (springJoint != null) return;
         if (!canSwing) return;
         if (OnWall) wall.Cancel();
         if (!TryFindSwingPoint(out swingPoint)) return;
@@ -343,16 +334,15 @@ public class PlayerSwinging : MonoBehaviour
         airborneAfterSwing = false;
         swingStartTime = Time.time;
 
-        joint = gameObject.AddComponent<SpringJoint>();
-        joint.autoConfigureConnectedAnchor = false;
-        joint.connectedAnchor = swingPoint;
+        springJoint = gameObject.AddComponent<SpringJoint>();
+        springJoint.autoConfigureConnectedAnchor = false;
+        springJoint.connectedAnchor = swingPoint;
 
-        float distance = Vector3.Distance(transform.position, swingPoint);
-        joint.maxDistance = distance;
-        joint.minDistance = 0f;
-        joint.spring = spring;
-        joint.damper = damper;
-        joint.massScale = 1f;
+        springJoint.maxDistance = Vector3.Distance(transform.position, swingPoint);
+        springJoint.minDistance = 0f;
+        springJoint.spring = spring;
+        springJoint.damper = damper;
+        springJoint.massScale = 1f;
 
         ApplyDiveConversion();
         lineRenderer.positionCount = 2;
@@ -375,23 +365,32 @@ public class PlayerSwinging : MonoBehaviour
     /// <param name="jumped"><c>true</c> if the release was triggered by a jump press.</param>
     private void ReleaseWeb(bool jumped)
     {
-        if (joint == null) return;
+        if (springJoint == null) 
+            return;
 
         playerMovement.isSwinging = false;
         lineRenderer.positionCount = 0;
-        Destroy(joint);
-        joint = null;
+        Destroy(springJoint);
+        springJoint = null;
         canSwing = false;
         Invoke(nameof(ResetSwing), swingCooldown);
 
-        Vector3 velocity = rb.linearVelocity;
-        float speed = velocity.magnitude;
-        bool longEnough = Time.time - swingStartTime >= minGoodSwingTime;
+        Vector3 velocity = rigidBody.linearVelocity;
         dragReliefStrength = 0f;
 
         if (jumped)
         {
-            float timing = longEnough ? EvaluateJumpTiming(velocity) : 0f;
+            float timing;
+
+            if (Time.time - swingStartTime >= minGoodSwingTime)
+            {
+                timing = EvaluateJumpTiming(velocity);
+            }
+            else
+            {
+                timing = 0f;
+            }
+
             LastJumpTiming = timing;
 
             if (timing >= minJumpTiming)
@@ -402,16 +401,13 @@ public class PlayerSwinging : MonoBehaviour
 
             velocity += velocity.normalized * jumpSpeedBoost * timing;
             velocity += Vector3.up * jumpSpeedBoostUp;
-            rb.AddForce(Vector3.up * jumpUpImpulse, ForceMode.Impulse);
+            rigidBody.AddForce(Vector3.up * jumpUpImpulse, ForceMode.Impulse);
 
             playerMovement.jumpConsumed = true; // stopping PlayerMovement treating this press as a ground jump
         }
         else
         {
-            bool good = longEnough
-                        && velocity.y >= minRisingSpeed
-                        && speed >= goodReleaseSpeedRatio * CurrentMaxSpeed;
-            if (good)
+            if ((Time.time - swingStartTime >= minGoodSwingTime) && velocity.y >= minRisingSpeed && velocity.magnitude >= goodReleaseSpeedRatio * CurrentMaxSpeed)
             {
                 comboLevel = Mathf.Min(comboLevel + releaseComboGain, maxComboLevel);
                 velocity += velocity.normalized * releaseSpeedBoost;
@@ -419,7 +415,7 @@ public class PlayerSwinging : MonoBehaviour
         }
 
         velocity = LimitUpwardVelocity(velocity);
-        rb.linearVelocity = Vector3.ClampMagnitude(velocity, BurstMaxSpeed);
+        rigidBody.linearVelocity = Vector3.ClampMagnitude(velocity, BurstMaxSpeed);
 
         lastReleaseTime = Time.time;
         airControlTimer = airControlDuration;
@@ -435,19 +431,17 @@ public class PlayerSwinging : MonoBehaviour
     /// <returns>The timing score, 0 (poor) to 1 (perfect).</returns>
     private float EvaluateJumpTiming(Vector3 velocity)
     {
-        float speed = velocity.magnitude;
-        if (speed < 0.1f) return 0f;
+        if (velocity.magnitude < 0.1f) 
+            return 0f;
 
-        float elevation = Mathf.Asin(Mathf.Clamp(velocity.y / speed, -1f, 1f)) * Mathf.Rad2Deg;
+        float elevation = Mathf.Asin(Mathf.Clamp(velocity.y / velocity.magnitude, -1f, 1f)) * Mathf.Rad2Deg;
         float angleFactor = 1f - Mathf.Clamp01(Mathf.Abs(elevation - idealJumpAngle) / jumpAngleWindow);
-
-        float speedRatio = speed / CurrentMaxSpeed;
+        float speedRatio = velocity.magnitude / CurrentMaxSpeed;
         float speedFactor = Mathf.InverseLerp(minJumpSpeedRatio, fullJumpSpeedRatio, speedRatio);
-
         float timing = angleFactor * speedFactor;
 
         if (debugLogTiming)
-            Debug.Log($"Swing jump timing {timing:F2} | angle {elevation:F0} deg (factor {angleFactor:F2}) | speed {speedRatio:P0} of cap (factor {speedFactor:F2})");
+            Debug.Log($"Swing jump timing {timing:F2} | angle {elevation:F0} degrees (factor {angleFactor:F2}) | speed {speedRatio:P0} of cap (factor {speedFactor:F2})");
 
         return timing;
     }
@@ -460,16 +454,22 @@ public class PlayerSwinging : MonoBehaviour
     /// <returns>The adjusted velocity.</returns>
     private Vector3 LimitUpwardVelocity(Vector3 velocity)
     {
-        if (velocity.y <= maxLaunchUpSpeed) return velocity;
+        if (velocity.y <= maxLaunchUpSpeed) 
+            return velocity;
 
-        Vector3 flat = new Vector3(velocity.x, 0f, velocity.z);
-        Vector3 dir = flat.sqrMagnitude > 0.01f
-            ? flat.normalized
-            : Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
+        Vector3 flatVelocity = new Vector3(velocity.x, 0f, velocity.z);
 
-        float total = velocity.magnitude;
-        float horizontal = Mathf.Sqrt(Mathf.Max(0f, total * total - maxLaunchUpSpeed * maxLaunchUpSpeed));
-        return dir * horizontal + Vector3.up * maxLaunchUpSpeed;
+        Vector3 direction;
+        if (flatVelocity.sqrMagnitude > 0.01f)
+        {
+            direction = flatVelocity.normalized;
+        }
+        else
+        {
+            direction = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
+        }
+
+        return direction * (Mathf.Sqrt(Mathf.Max(0f, velocity.magnitude * velocity.magnitude - maxLaunchUpSpeed * maxLaunchUpSpeed))) + Vector3.up * maxLaunchUpSpeed;
     }
 
     /// <summary>Ends the post-release control phase and gives movement back to <see cref="PlayerMovement"/>.</summary>
@@ -483,11 +483,7 @@ public class PlayerSwinging : MonoBehaviour
     /// <returns><c>true</c> if an air jump can be performed.</returns>
     private bool CanAirJump()
     {
-        return joint == null
-            && airborneAfterSwing
-            && !playerMovement.IsGrounded
-            && airJumpsUsed < maxAirJumps
-            && !playerMovement.jumpConsumed;
+        return springJoint == null && airborneAfterSwing && !playerMovement.IsGrounded && airJumpsUsed < maxAirJumps && !playerMovement.jumpConsumed;
     }
 
     /// <summary>
@@ -498,13 +494,8 @@ public class PlayerSwinging : MonoBehaviour
         airJumpsUsed++;
         EndDive(false);
 
-        Vector3 velocity = rb.linearVelocity;
-        Vector3 horizontal = new Vector3(velocity.x, 0f, velocity.z) * airJumpMomentumKeep;
-
-        // replace vertical speed
-        float vertical = Mathf.Max(velocity.y, airJumpUpSpeed);
-
-        rb.linearVelocity = new Vector3(horizontal.x, vertical, horizontal.z);
+        Vector3 currentHorizontalVelocity = new Vector3(rigidBody.linearVelocity.x, 0f, rigidBody.linearVelocity.z) * airJumpMomentumKeep;
+        rigidBody.linearVelocity = new Vector3(currentHorizontalVelocity.x, Mathf.Max(rigidBody.linearVelocity.y, airJumpUpSpeed), currentHorizontalVelocity.z);
 
         // stops PlayerMovement from treating this press as a ground jump when landing
         playerMovement.jumpConsumed = true;
@@ -520,39 +511,49 @@ public class PlayerSwinging : MonoBehaviour
     private bool TryFindSwingPoint(out Vector3 point)
     {
         Vector3 forward = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up);
-        if (forward.sqrMagnitude < 0.001f) forward = transform.forward;
+        if (forward.sqrMagnitude < 0.001f) 
+            forward = transform.forward;
         forward.Normalize();
 
         int side = swingSide;
-        Vector2 move = moveAction != null ? moveAction.ReadValue<Vector2>() : Vector2.zero;
-        if (Mathf.Abs(move.x) > 0.3f) side = (int)Mathf.Sign(move.x);
+        Vector2 moveValue;
+        if (moveAction != null)
+        {
+            moveValue = moveAction.ReadValue<Vector2>();
+        }
+        else
+        {
+            moveValue = Vector2.zero;
+        }
 
-        Vector3 origin = transform.position + Vector3.up;
+        if (Mathf.Abs(moveValue.x) > 0.3f)
+            side = (int)Mathf.Sign(moveValue.x);
+
         float bestScore = float.MaxValue;
         Vector3 bestPoint = Vector3.zero;
-        bool found = false;
+        bool foundSwingPoint = false;
 
         /// <summary>Local function. Casts one candidate direction and keeps the hit if it is valid and scores better than the best so far.</summary>
-        /// <param name="dir">World direction to cast.</param>
+        /// <param name="direction">World direction to cast.</param>
         /// <param name="radius">Sphere cast radius.</param>
         /// <param name="yaw">Yaw of the candidate in degrees, used for scoring.</param>
         /// <param name="pitch">Pitch of the candidate in degrees, used for scoring.</param>
         /// <param name="bonus">Score reduction applied to preferred candidates.</param>
-        void Consider(Vector3 dir, float radius, float yaw, float pitch, float bonus)
+        void ConsiderSwingPoint(Vector3 direction, float radius, float yaw, float pitch, float bonus)
         {
-            if (!Physics.SphereCast(origin, radius, dir, out RaycastHit hit, maxSwingDistance, grappable)) return;
-            if (hit.distance < minAnchorDistance) return;
-            if (hit.point.y - transform.position.y < minAnchorHeight) return;
+            if (!Physics.SphereCast(transform.position + Vector3.up, radius, direction, out RaycastHit hit, maxSwingDistance, grappable)) 
+                return;
+            if (hit.distance < minAnchorDistance) 
+                return;
+            if (hit.point.y - transform.position.y < minAnchorHeight) 
+                return;
 
-            float score = Mathf.Abs(yaw - idealYaw) * 0.5f
-                        + Mathf.Abs(pitch - idealPitch) * 0.3f
-                        + Mathf.Abs(hit.distance - idealDistance) * 0.4f
-                        - bonus;
+            float score = Mathf.Abs(yaw - idealYaw) * 0.5f + Mathf.Abs(pitch - idealPitch) * 0.3f + Mathf.Abs(hit.distance - idealDistance) * 0.4f - bonus;
             if (score < bestScore)
             {
                 bestScore = score;
                 bestPoint = hit.point;
-                found = true;
+                foundSwingPoint = true;
             }
         }
 
@@ -561,18 +562,15 @@ public class PlayerSwinging : MonoBehaviour
             Vector3 flat = Quaternion.AngleAxis(side * yaw, Vector3.up) * forward;
             foreach (float pitch in pitchAngles)
             {
-                float rad = pitch * Mathf.Deg2Rad;
-                Vector3 dir = flat * Mathf.Cos(rad) + Vector3.up * Mathf.Sin(rad);
-                Consider(dir, anchorSphereRadius, yaw, pitch, 0f);
+                float pitchInRadians = pitch * Mathf.Deg2Rad;
+                ConsiderSwingPoint(flat * Mathf.Cos(pitchInRadians) + Vector3.up * Mathf.Sin(pitchInRadians), anchorSphereRadius, yaw, pitch, 0f);
             }
         }
 
-        Vector3 aim = cameraTransform.forward;
-        float aimPitch = Mathf.Asin(Mathf.Clamp(aim.y, -1f, 1f)) * Mathf.Rad2Deg;
-        Consider(aim, anchorSphereRadius * 2f, idealYaw, aimPitch, cameraAimBonus);
+        ConsiderSwingPoint(cameraTransform.forward, anchorSphereRadius * 2f, idealYaw, Mathf.Asin(Mathf.Clamp(cameraTransform.forward.y, -1f, 1f)) * Mathf.Rad2Deg, cameraAimBonus);
 
         point = bestPoint;
-        return found;
+        return foundSwingPoint;
     }
 
     /// <summary>
@@ -581,19 +579,14 @@ public class PlayerSwinging : MonoBehaviour
     /// </summary>
     private void SwingPhysics()
     {
-        float power = Power;
+        springJoint.maxDistance = Mathf.Max(minRopeLength, springJoint.maxDistance - reelSpeed * Power * Time.fixedDeltaTime);
+        rigidBody.AddForce(Vector3.down * extraGravity * Power, ForceMode.Acceleration);
 
-        joint.maxDistance = Mathf.Max(minRopeLength, joint.maxDistance - reelSpeed * power * Time.fixedDeltaTime);
+        if (GetCameraRelativeInput().sqrMagnitude > 0.01f)
+            rigidBody.AddForce(GetCameraRelativeInput() * swingPushAcceleration * Power, ForceMode.Acceleration);
 
-        rb.AddForce(Vector3.down * extraGravity * power, ForceMode.Acceleration);
-
-        Vector3 desired = GetCameraRelativeInput();
-        if (desired.sqrMagnitude > 0.01f)
-            rb.AddForce(desired * swingPushAcceleration * power, ForceMode.Acceleration);
-
-        float cap = EffectiveMaxSpeed;
-        if (rb.linearVelocity.magnitude > cap)
-            rb.linearVelocity = rb.linearVelocity.normalized * cap;
+        if (rigidBody.linearVelocity.magnitude > EffectiveMaxSpeed)
+            rigidBody.linearVelocity = rigidBody.linearVelocity.normalized * EffectiveMaxSpeed;
     }
 
     // ---------------------------------------------------------------------------Flight after release
@@ -601,11 +594,11 @@ public class PlayerSwinging : MonoBehaviour
     /// <summary>Adds extra downward acceleration during post-release flight (more once falling).</summary>
     public void ApplyAirGravity()
     {
-        float extra = postReleaseGravity;
-        if (rb.linearVelocity.y < 0f)
-            extra += fallGravity;
+        float extraGravity = postReleaseGravity;
+        if (rigidBody.linearVelocity.y < 0f)
+            extraGravity += fallGravity;
 
-        rb.AddForce(Vector3.down * extra, ForceMode.Acceleration);
+        rigidBody.AddForce(Vector3.down * extraGravity, ForceMode.Acceleration);
     }
 
     /// <summary>
@@ -614,29 +607,23 @@ public class PlayerSwinging : MonoBehaviour
     /// </summary>
     private void AirControl()
     {
-        Vector3 desired = GetCameraRelativeInput();
-        if (desired.sqrMagnitude < 0.01f) return;
+        if (GetCameraRelativeInput().sqrMagnitude < 0.01f) 
+            return;
 
-        Vector3 velocity = rb.linearVelocity;
-        Vector3 horizontal = new Vector3(velocity.x, 0f, velocity.z);
-        float speed = horizontal.magnitude;
+        Vector3 horizontalVelocity = new Vector3(rigidBody.linearVelocity.x, 0f, rigidBody.linearVelocity.z);
 
-        if (speed < 1f)
+        if (horizontalVelocity.magnitude < 1f)
         {
-            horizontal += desired * airAcceleration * Time.fixedDeltaTime;
+            horizontalVelocity += GetCameraRelativeInput() * airAcceleration * Time.fixedDeltaTime;
         }
         else
         {
-            horizontal = Vector3.RotateTowards(
-                horizontal,
-                desired * speed,
-                steerDegreesPerSecond * Mathf.Deg2Rad * Time.fixedDeltaTime,
-                0f);
-            horizontal += desired * airAcceleration * Time.fixedDeltaTime;
+            horizontalVelocity = Vector3.RotateTowards(horizontalVelocity, GetCameraRelativeInput() * horizontalVelocity.magnitude, steerDegreesPerSecond * Mathf.Deg2Rad * Time.fixedDeltaTime, 0f);
+            horizontalVelocity += GetCameraRelativeInput() * airAcceleration * Time.fixedDeltaTime;
         }
 
-        horizontal = Vector3.ClampMagnitude(horizontal, BurstMaxSpeed);
-        rb.linearVelocity = new Vector3(horizontal.x, velocity.y, horizontal.z);
+        horizontalVelocity = Vector3.ClampMagnitude(horizontalVelocity, BurstMaxSpeed);
+        rigidBody.linearVelocity = new Vector3(horizontalVelocity.x, rigidBody.linearVelocity.y, horizontalVelocity.z);
     }
 
     /// <summary>
@@ -644,19 +631,16 @@ public class PlayerSwinging : MonoBehaviour
     /// </summary>
     public void ApplyAirDrag()
     {
-        Vector3 velocity = rb.linearVelocity;
-        Vector3 horizontal = new Vector3(velocity.x, 0f, velocity.z);
-        float speed = horizontal.magnitude;
-        if (speed < 0.01f) return;
+        Vector3 horizontalVelocity = new Vector3(rigidBody.linearVelocity.x, 0f, rigidBody.linearVelocity.z);
+        if (horizontalVelocity.magnitude < 0.01f)
+            return;
 
-        float dragRate = airDrag + airDragQuadratic * speed;
+        float horizontalDragRate = airDrag + airDragQuadratic * horizontalVelocity.magnitude;
 
         // A well-timed jump keeps its speed longer
-        float reliefFade = Mathf.Clamp01(1f - (Time.time - lastReleaseTime) / dragReliefTime);
-        dragRate *= 1f - jumpDragRelief * dragReliefStrength * reliefFade;
-
-        horizontal *= 1f - Mathf.Clamp01(dragRate * Time.fixedDeltaTime);
-        rb.linearVelocity = new Vector3(horizontal.x, velocity.y, horizontal.z);
+        horizontalDragRate *= 1f - jumpDragRelief * dragReliefStrength * Mathf.Clamp01(1f - (Time.time - lastReleaseTime) / dragReliefTime);
+        horizontalVelocity *= 1f - Mathf.Clamp01(horizontalDragRate * Time.fixedDeltaTime);
+        rigidBody.linearVelocity = new Vector3(horizontalVelocity.x, rigidBody.linearVelocity.y, horizontalVelocity.z);
     }
 
     // ------------------------------------------------------------------------------------ Dive
@@ -697,7 +681,7 @@ public class PlayerSwinging : MonoBehaviour
     /// <returns><c>true</c> if a dive can start.</returns>
     private bool CanDive()
     {
-        return joint == null && !isDiving && !playerMovement.IsGrounded && !Busy;  
+        return springJoint == null && !isDiving && !playerMovement.IsGrounded && !isBusy;  
     }
 
     /// <summary>Starts a dive: records the start time and snaps vertical velocity to at least <see cref="diveStartDownSpeed"/> downward.</summary>
@@ -707,8 +691,7 @@ public class PlayerSwinging : MonoBehaviour
         diveStartTime = Time.time;
 
         // Cancel any upward motion and snap into a downward dive.
-        Vector3 velocity = rb.linearVelocity;
-        rb.linearVelocity = new Vector3(velocity.x, Mathf.Min(velocity.y, -diveStartDownSpeed), velocity.z);
+        rigidBody.linearVelocity = new Vector3(rigidBody.linearVelocity.x, Mathf.Min(rigidBody.linearVelocity.y, -diveStartDownSpeed), rigidBody.linearVelocity.z);
     }
 
     /// <summary>
@@ -717,18 +700,26 @@ public class PlayerSwinging : MonoBehaviour
     /// </summary>
     private void UpdateDive()
     {
-        if (!isDiving) return;
+        if (!isDiving)
+            return;
 
-        if (playerMovement.IsGrounded) { EndDive(false); return; } // landing: no swing bonus
-        if (!DiveHeld) { EndDive(true); return; }
+        if (playerMovement.IsGrounded)
+        {
+            EndDive(false);
+            return;
+        } // landing: no swing bonus
+        if (!DiveHeld)
+        { 
+            EndDive(true);
+            return;
+        }
 
         lastDiveTime = Time.time; // keeps the carry window and combo timer fresh while diving
 
-        rb.AddForce(Vector3.down * diveAcceleration, ForceMode.Acceleration);
+        rigidBody.AddForce(Vector3.down * diveAcceleration, ForceMode.Acceleration);
 
-        Vector3 velocity = rb.linearVelocity;
-        if (velocity.y < -maxDiveSpeed)
-            rb.linearVelocity = new Vector3(velocity.x, -maxDiveSpeed, velocity.z);
+        if (rigidBody.linearVelocity.y < -maxDiveSpeed)
+            rigidBody.linearVelocity = new Vector3(rigidBody.linearVelocity.x, -maxDiveSpeed, rigidBody.linearVelocity.z);
     }
 
     /// <summary>Ends the dive and records its duration. Sets the carry timer so a swing started soon after still gets the dive bonus.</summary>
@@ -740,7 +731,15 @@ public class PlayerSwinging : MonoBehaviour
             isDiving = false;
             lastDiveDuration = Time.time - diveStartTime;
         }
-        lastDiveTime = keepCarry ? Time.time : -999f;
+
+        if (keepCarry)
+        {
+            lastDiveTime = Time.time;
+        }
+        else
+        {
+            lastDiveTime = -999f;
+        }
     }
 
     /// <summary>
@@ -749,26 +748,35 @@ public class PlayerSwinging : MonoBehaviour
     /// </summary>
     private void ApplyDiveConversion()
     {
-        if (!isDiving && Time.time - lastDiveTime > diveCarryTime) return;
+        if (!isDiving && Time.time - lastDiveTime > diveCarryTime) 
+            return;
 
-        float duration = isDiving ? Time.time - diveStartTime : lastDiveDuration;
+        float diveDuration;
+        if (isDiving)
+        {
+            diveDuration = Time.time - diveStartTime;
+        }
+        else
+        {
+            diveDuration = lastDiveDuration;
+        }
+
         EndDive(false); // a dive can only be spent once
 
-        if (duration < minDiveTime) return;
-        float scale = Mathf.InverseLerp(minDiveTime, fullDiveTime, duration);
+        if (diveDuration < minDiveTime) 
+            return;
 
-        Vector3 velocity = rb.linearVelocity;
-        Vector3 ropeDir = (swingPoint - transform.position).normalized; // points to the anchor
+        Vector3 ropeDirection = (swingPoint - transform.position).normalized; // points to the anchor
 
-        float outward = Mathf.Max(0f, Vector3.Dot(velocity, -ropeDir));
-        if (outward < 1f) return;
+        if (Mathf.Max(0f, Vector3.Dot(rigidBody.linearVelocity, -ropeDirection)) < 1f) 
+            return;
 
-        Vector3 flat = new Vector3(velocity.x, 0f, velocity.z);
+        Vector3 flatVelocity = new Vector3(rigidBody.linearVelocity.x, 0f, rigidBody.linearVelocity.z);
         Vector3 forward;
 
-        if (flat.sqrMagnitude > 1f)
+        if (flatVelocity.sqrMagnitude > 1f)
         {
-            forward = flat.normalized;
+            forward = flatVelocity.normalized;
         }
         else
         {
@@ -776,26 +784,26 @@ public class PlayerSwinging : MonoBehaviour
         }
 
         // Direction of the arc: forward and down, perpendicular to the rope.
-        Vector3 tangent = Vector3.ProjectOnPlane(forward, ropeDir);
-        if (tangent.sqrMagnitude < 0.001f) return;
+        Vector3 tangent = Vector3.ProjectOnPlane(forward, ropeDirection);
+        if (tangent.sqrMagnitude < 0.001f) 
+            return;
         tangent.Normalize();
 
-        Vector3 kept = Vector3.ProjectOnPlane(velocity, ropeDir); // velocity without the outward part
-        Vector3 newVelocity = kept + tangent * (outward * diveSwingConversion * scale);
+        Vector3 newVelocity = Vector3.ProjectOnPlane(rigidBody.linearVelocity, ropeDirection) + tangent * (Mathf.Max(0f, Vector3.Dot(rigidBody.linearVelocity, -ropeDirection)) * diveSwingConversion * Mathf.InverseLerp(minDiveTime, fullDiveTime, diveDuration));
         newVelocity = Vector3.ClampMagnitude(newVelocity, maxDiveSwingSpeed);
 
-        rb.linearVelocity = newVelocity;
+        rigidBody.linearVelocity = newVelocity;
         swingSpeedCap = Mathf.Max(CurrentMaxSpeed, newVelocity.magnitude); // let the boost exist, then decay
     }
 
     /// <summary>Destroys the swing joint and hides the rope without any release reward. Called by <see cref="WebZip"/> when a zip starts.</summary>
     public void CancelSwingForZip()
     {
-        if (joint == null) return;
+        if (springJoint == null) return;
         playerMovement.isSwinging = false;
         lineRenderer.positionCount = 0;
-        Destroy(joint);
-        joint = null;
+        Destroy(springJoint);
+        springJoint = null;
         wantsSwing = false;
     }
 
@@ -821,7 +829,7 @@ public class PlayerSwinging : MonoBehaviour
     {
         comboLevel = Mathf.Min(comboLevel + combo, maxComboLevel);
         swingSpeedCap = Mathf.Max(swingSpeedCap, exitVelocity.magnitude); // boost exists, then decays
-        rb.linearVelocity = Vector3.ClampMagnitude(exitVelocity, BurstMaxSpeed);
+        rigidBody.linearVelocity = Vector3.ClampMagnitude(exitVelocity, BurstMaxSpeed);
         dragReliefStrength = dragRelief;
         lastReleaseTime = Time.time;
         airControlTimer = airControlDuration;
@@ -853,12 +861,10 @@ public class PlayerSwinging : MonoBehaviour
     /// <returns>A normalised direction, or <see cref="Vector3.zero"/> when there is no input.</returns>
     private Vector3 GetCameraRelativeInput()
     {
-        if (moveAction == null) return Vector3.zero;
-        Vector2 input = moveAction.ReadValue<Vector2>();
+        if (moveAction == null) 
+            return Vector3.zero;
 
-        Vector3 forward = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
-        Vector3 right = Vector3.ProjectOnPlane(cameraTransform.right, Vector3.up).normalized;
-        return (forward * input.y + right * input.x).normalized;
+        return (Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized * moveAction.ReadValue<Vector2>().y + Vector3.ProjectOnPlane(cameraTransform.right, Vector3.up).normalized * moveAction.ReadValue<Vector2>().x).normalized;
     }
 
     // ------------------------------------------------------------------------------ Rope
@@ -866,11 +872,10 @@ public class PlayerSwinging : MonoBehaviour
     /// <summary>Animates the rope shooting toward the anchor and keeps its start at the web tip. Does nothing when no web is attached.</summary>
     private void DrawRope()
     {
-        if (joint == null) return;
+        if (springJoint == null)
+            return;
 
-        currentGrapplePosition = Vector3.MoveTowards(
-            currentGrapplePosition, swingPoint, ropeShootSpeed * Time.deltaTime);
-
+        currentGrapplePosition = Vector3.MoveTowards(currentGrapplePosition, swingPoint, ropeShootSpeed * Time.deltaTime);
         lineRenderer.SetPosition(0, webTip.position);
         lineRenderer.SetPosition(1, currentGrapplePosition);
     }
@@ -884,11 +889,14 @@ public class PlayerSwinging : MonoBehaviour
         CancelInvoke(nameof(ResetSwing));
         canSwing = true;
 
-        if (joint != null) { Destroy(joint); joint = null; }
+        if (springJoint != null) 
+        {
+            Destroy(springJoint); springJoint = null; 
+        }
+
         lineRenderer.positionCount = 0;
         wantsSwing = false;
         playerMovement.isSwinging = false;
-
         swingSpeedCap = 0f;
         comboLevel = 0f;
         BeginZipMomentum();
