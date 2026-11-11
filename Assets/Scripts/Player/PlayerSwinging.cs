@@ -28,118 +28,124 @@ public class PlayerSwinging : MonoBehaviour
     private InputAction diveAction;
 
     [Header("References")]
-    public LineRenderer lineRenderer;
-    public Transform webTip;
+    [SerializeField]
+    private LineRenderer lineRenderer;
+    [SerializeField]
+    private Transform webTip;
     [FormerlySerializedAs("camera")] public Transform cameraTransform;
     public LayerMask grappable;
 
     [Header("Web Aiming")]
-    public float maxSwingDistance = 55f;
-    public float minAnchorDistance = 8f;
-    public float minAnchorHeight = 5f;
-    public float anchorSphereRadius = 1.5f;
-    public float[] pitchAngles = { 55f, 45f, 65f, 35f, 75f };
+    [SerializeField] private float maxSwingDistance = 55f;
+    [SerializeField] private float minAnchorDistance = 8f;
+    [SerializeField] private float minAnchorHeight = 5f;
+    [SerializeField] private float anchorSphereRadius = 1.5f;
+    [SerializeField] private float[] pitchAngles = { 55f, 45f, 65f, 35f, 75f };
     [Tooltip("Yaw offsets from camera forward. Positive = the side we're swinging toward.")]
-    public float[] yawOffsets = { 20f, 0f, 40f, -20f, -40f, 70f, -70f };
-    public float idealYaw = 20f;
-    public float idealPitch = 55f;
-    public float idealDistance = 25f;
-    public float cameraAimBonus = 10f;
-    public float retryInterval = 0.1f;
+    [SerializeField] private float[] yawOffsets = { 20f, 0f, 40f, -20f, -40f, 70f, -70f };
+    [SerializeField] private float idealYaw = 20f;
+    [SerializeField] private float idealPitch = 55f;
+    [SerializeField] private float idealDistance = 25f;
+    [SerializeField] private float cameraAimBonus = 10f;
+    [SerializeField] private float retryInterval = 0.1f;
 
     [Header("Rope")]
-    public float spring = 60f;
-    public float damper = 6f;
-    public float reelSpeed = 3f;
-    public float minRopeLength = 8f;
-    public float ropeShootSpeed = 200f;
+    [SerializeField] private float spring = 60f;
+    [SerializeField] private float damper = 6f;
+    [SerializeField] private float reelSpeed = 3f;
+    [SerializeField] private float minRopeLength = 8f;
+    [SerializeField] private float ropeShootSpeed = 200f;
 
     [Header("Swing Feel")]
-    public float extraGravity = 15f;
-    public float swingPushAcceleration = 12f;
+    [SerializeField] private float extraGravity = 15f;
+    [SerializeField] private  float swingPushAcceleration = 12f;
 
     [Header("Swing cooldown")]
-    public float swingCooldown;
-    [SerializeField]
-    private bool canSwing = true;
+    [SerializeField] private float swingCooldown;
+    [SerializeField] private bool canSwing = true;
 
     [Header("Speed Progression combo")]
-    public float baseMaxSpeed = 35f;
-    public float topMaxSpeed = 80f;
-    public int maxComboLevel = 6;
-    public float comboWindow = 1.5f;
-    public float maxPowerMultiplier = 1.5f;
+    [SerializeField] private float baseMaxSpeed = 35f;
+    [SerializeField] private float topMaxSpeed = 80f;
+    [SerializeField] private int maxComboLevel = 6;
+    [SerializeField] private float comboWindow = 1.5f;
+    [SerializeField] private float maxPowerMultiplier = 1.5f;
     [Tooltip("A jump or release can briefly exceed the cap by this factor. Drag brings it back down.")]
-    public float burstMultiplier = 1.25f;
+    [SerializeField] private float burstMultiplier = 1.25f;
 
     [Header("Plain Release (minor reward)")]
-    public float minGoodSwingTime = 0.5f;
-    public float minRisingSpeed = 2f;
+    [SerializeField] private float minGoodSwingTime = 0.5f;
+    [SerializeField] private float minRisingSpeed = 2f;
     [Range(0.3f, 1f)] public float goodReleaseSpeedRatio = 0.7f;
     [Tooltip("Combo levels gained by a well-timed plain release.")]
-    public float releaseComboGain = 0.25f;
-    public float releaseSpeedBoost = 1.5f;
+    [SerializeField] private float releaseComboGain = 0.25f;
+    [SerializeField] private float releaseSpeedBoost = 1.5f;
 
     [Header("Swing Jump (major reward)")]
     [Tooltip("Best launch angle above horizontal, i.e. how steeply you're rising when you jump.")]
-    public float idealJumpAngle = 35f;
+    [SerializeField] private float idealJumpAngle = 35f;
     [Tooltip("Half-width of the timing window in degrees. Smaller = stricter.")]
-    public float jumpAngleWindow = 30f;
+    [SerializeField] private float jumpAngleWindow = 30f;
     [Tooltip("Below this fraction of the speed cap, the jump earns nothing.")]
     [Range(0f, 1f)] public float minJumpSpeedRatio = 0.5f;
     [Tooltip("At or above this fraction of the speed cap, speed counts fully.")]
     [Range(0f, 1f)] public float fullJumpSpeedRatio = 0.9f;
     [Range(0f, 1f)] public float minJumpTiming = 0.3f;
     [Tooltip("Combo levels gained by a perfect jump (scaled by timing).")]
-    public float jumpComboGain = 1f;
+    [SerializeField] private float jumpComboGain = 1f;
     [Tooltip("Extra speed (m/s) along your velocity on a perfect jump (scaled by timing).")]
-    public float jumpSpeedBoost = 12f;
-    public float jumpSpeedBoostUp = 3f;
-    public float jumpUpImpulse = 35f;
+    [SerializeField] private float jumpSpeedBoost = 12f;
+    [SerializeField] private float jumpSpeedBoostUp = 3f;
+    [SerializeField]private  float jumpUpImpulse = 35f;
     [Tooltip("How much a perfect jump reduces air drag, fading out over Drag Relief Time.")]
     [Range(0f, 1f)] public float jumpDragRelief = 0.7f;
-    public float dragReliefTime = 1.5f;
-    public bool debugLogTiming = false;
+    [SerializeField] private float dragReliefTime = 1.5f;
+    [SerializeField] private bool debugLogTiming = false;
 
     [Header("After Release: Flight")]
     [Tooltip("Upward speed is capped at this on release. Extra goes into forward speed instead.")]
-    public float maxLaunchUpSpeed = 10f;
+    [SerializeField] private float maxLaunchUpSpeed = 10f;
     [Tooltip("Extra downward acceleration for the whole flight.")]
-    public float postReleaseGravity = 10f;
+    [SerializeField] private float postReleaseGravity = 10f;
     [Tooltip("More downward acceleration once you're falling.")]
-    public float fallGravity = 12f;
+    [SerializeField] private float fallGravity = 12f;
 
     [Header("After Release: Air Jump")]
     [Tooltip("Jumps allowed in the air after each web release. Refills on every release.")]
-    public int maxAirJumps = 1;
+    [SerializeField] private int maxAirJumps = 1;
     [Tooltip("Upward speed of the air jump. If you're already rising faster, that is kept.")]
-    public float airJumpUpSpeed = 11f;
+    [SerializeField] private  float airJumpUpSpeed = 11f;
     [Tooltip("Fraction of horizontal speed kept when you air jump. 0.85 = lose 15%.")]
     [Range(0.3f, 1f)] public float airJumpMomentumKeep = 0.85f;
 
     [Header("Dive")]
     [Tooltip("Downward speed you snap to when a dive starts.")]
-    public float diveStartDownSpeed = 10f;
-    public float diveAcceleration = 45f;
-    public float maxDiveSpeed = 70f;
+    [SerializeField] private float diveStartDownSpeed = 10f;
+    [SerializeField] private  float diveAcceleration = 45f;
+    [SerializeField] private float maxDiveSpeed = 70f;
     [Tooltip("Dives shorter than this give no swing bonus.")]
-    public float minDiveTime = 0.3f;
+    [SerializeField] private float minDiveTime = 0.3f;
     [Tooltip("Dives this long (or longer) give the full swing bonus.")]
-    public float fullDiveTime = 1.2f;
+    [SerializeField] private float fullDiveTime = 1.2f;
     [Tooltip("You can let go of dive and still get the bonus if you swing within this time.")]
-    public float diveCarryTime = 0.5f;
+    [SerializeField] private float diveCarryTime = 0.5f;
     [Tooltip("How much of your fall speed becomes swing speed (at a full-length dive).")]
     [Range(0f, 1.5f)] public float diveSwingConversion = 0.9f;
-    public float maxDiveSwingSpeed = 90f;
+    [SerializeField] private float maxDiveSwingSpeed = 90f;
     [Tooltip("The raised speed cap from a dive-swing fades back to normal at this rate (m/s per second).")]
-    public float diveCapDecay = 12f;
+    [SerializeField] private float diveCapDecay = 12f;
 
     [Header("After Release: Air Control & Drag")]
-    public float airControlDuration = 1.2f;
-    public float steerDegreesPerSecond = 120f;
-    public float airAcceleration = 10f;
-    public float airDrag = 0.3f;
-    public float airDragQuadratic = 0.025f;
+    [SerializeField]
+    private float airControlDuration = 1.2f;
+    [SerializeField]
+    private float steerDegreesPerSecond = 120f;
+    [SerializeField]
+    private float airAcceleration = 10f;
+    [SerializeField]
+    private float airDrag = 0.3f;
+    [SerializeField]
+    private float airDragQuadratic = 0.025f;
 
     // Read these from other scripts (camera, UI, etc.)
     /// <summary>The current combo level, rounded down.</summary>
@@ -178,14 +184,12 @@ public class PlayerSwinging : MonoBehaviour
     private float airControlTimer;
     private bool wantsSwing;
     private float nextRetryTime;
-
     private float comboLevel;
     private float swingStartTime;
     private float lastReleaseTime = -999f;
     private float dragReliefStrength;
     private bool airborneAfterSwing;
     private int airJumpsUsed;
-
     private bool isDiving;
     private float diveStartTime;
     private float lastDiveTime = -999f;

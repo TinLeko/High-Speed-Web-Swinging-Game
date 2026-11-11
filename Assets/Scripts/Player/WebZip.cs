@@ -18,37 +18,37 @@ public class WebZip : MonoBehaviour
 {
     [Header("References")]
     private Camera aimCamera;
-    public Transform webTip;
-    public LineRenderer zipLine;
+    [SerializeField] private Transform webTip;
+    [SerializeField] private LineRenderer zipLine;
     public LayerMask zippable;
 
     [Header("Aiming")]
-    public float maxZipDistance = 70f;
-    public float minZipDistance = 6f;
+    [SerializeField] private float maxZipDistance = 70f;
+    [SerializeField] private float minZipDistance = 6f;
     [Tooltip("If the exact cursor ray misses, a fat ray of this radius is tried (aim assist).")]
-    public float aimAssistRadius = 0.6f;
+    [SerializeField] private float aimAssistRadius = 0.6f;
 
     [Header("Zip")]
     [Tooltip("Minimum speed toward the target the instant the zip fires: the 'snap'.")]
-    public float zipStartSpeed = 45f;
-    public float zipTopSpeed = 90f;
+    [SerializeField] private float zipStartSpeed = 45f;
+    [SerializeField] private float zipTopSpeed = 90f;
     [Tooltip("How fast the pull speed ramps up (m/s per second).")]
-    public float zipAcceleration = 250f;
+    [SerializeField] private float zipAcceleration = 250f;
     [Tooltip("How hard velocity is bent toward the target (m/s per second). Lower = keeps more old momentum.")]
-    public float steerAcceleration = 600f;
-    public float arriveDistance = 3f;
-    public float maxZipTime = 1.5f;
-    public float cooldown = 0.6f;
-    public float ropeShootSpeed = 300f; // visual only
+    [SerializeField] private float steerAcceleration = 600f;
+    [SerializeField] private float arriveDistance = 3f;
+    [SerializeField] private float maxZipTime = 1.5f;
+    [SerializeField] private float cooldown = 0.6f;
+    [SerializeField] private float ropeShootSpeed = 300f; // visual only
     public float consecutiveZips = 1f;
 
     [Header("Exit")]
     [Tooltip("Extra speed added when the zip completes: the 'quick impulse'.")]
-    public float exitSpeedBonus = 12f;
-    public float maxExitSpeed = 100f;
+    [SerializeField] private float exitSpeedBonus = 12f;
+    [SerializeField] private float maxExitSpeed = 100f;
     [Tooltip("Tilts the exit direction upward so you pop over ledges.")]
     [Range(0f, 0.5f)] public float exitUpBias = 0.15f;
-    public float comboGain = 0.5f;
+    [SerializeField] private float comboGain = 0.5f;
     [Range(0f, 1f)] public float dragRelief = 1f;
 
     public bool IsZipping { get; private set; }
@@ -58,9 +58,8 @@ public class WebZip : MonoBehaviour
     private PlayerMovement movement;
     private InputAction zipAction;
     private InputAction jumpAction;
-
     private Vector3 target;
-    private Vector3 launchDir;
+    private Vector3 launchDirection;
     private Vector3 lineEnd;
     private float zipSpeed;
     private float zipStartTime;
@@ -124,26 +123,22 @@ public class WebZip : MonoBehaviour
     /// </summary>
     private void FixedUpdate()
     {
-        if (!IsZipping) return;
+        if (!IsZipping) 
+            return;
 
         Vector3 toTarget = target - rigidBody.position;
-        float dist = toTarget.magnitude;
+        float distanceToTarget = toTarget.magnitude;
 
-        bool arrived = dist <= arriveDistance;
-        bool overshot = Vector3.Dot(toTarget, launchDir) < 0f;
-        bool timedOut = Time.time - zipStartTime > maxZipTime;
-        if (arrived || overshot || timedOut)
+        if ((distanceToTarget <= arriveDistance) || (Vector3.Dot(toTarget, launchDirection) < 0f) || (Time.time - zipStartTime > maxZipTime))
         {
             FinishZip();
             return;
         }
 
-        Vector3 dir = toTarget / dist;
         zipSpeed = Mathf.Min(zipSpeed + zipAcceleration * Time.fixedDeltaTime, zipTopSpeed);
 
         // Bend velocity toward the target rather than replacing it, so the pull has weight.
-        rigidBody.linearVelocity = Vector3.MoveTowards(
-            rigidBody.linearVelocity, dir * zipSpeed, steerAcceleration * Time.fixedDeltaTime);
+        rigidBody.linearVelocity = Vector3.MoveTowards(rigidBody.linearVelocity, (toTarget / distanceToTarget) * zipSpeed, steerAcceleration * Time.fixedDeltaTime);
 
         // PlayerMovement re-enables gravity every frame while swingMomentum is set, so cancelling it here.
         rigidBody.AddForce(-Physics.gravity, ForceMode.Acceleration);
@@ -154,7 +149,8 @@ public class WebZip : MonoBehaviour
     /// </summary>
     private void LateUpdate()
     {
-        if (!IsZipping) return;
+        if (!IsZipping) 
+            return;
 
         lineEnd = Vector3.MoveTowards(lineEnd, target, ropeShootSpeed * Time.deltaTime);
         zipLine.SetPosition(0, webTip.position);
@@ -193,8 +189,7 @@ public class WebZip : MonoBehaviour
     /// <returns>A world-space ray from the main camera.</returns>
     private Ray GetAimRay()
     {
-        bool cursorLocked = Cursor.lockState == CursorLockMode.Locked;
-        if (cursorLocked || Mouse.current == null)
+        if ((Cursor.lockState == CursorLockMode.Locked) || Mouse.current == null)
             return aimCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
 
         return aimCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
@@ -210,20 +205,22 @@ public class WebZip : MonoBehaviour
     private bool TryFindTarget(out Vector3 point)
     {
         point = Vector3.zero;
-        Ray ray = GetAimRay();
+        Ray aimRay = GetAimRay();
 
         // Third-person cameras sit behind the player. Start the ray level with the player so
         // walls between the camera and the player can't be picked as targets.
-        float skip = Mathf.Max(0f, Vector3.Dot(transform.position - ray.origin, ray.direction));
-        Vector3 origin = ray.origin + ray.direction * skip;
+        float skip = Mathf.Max(0f, Vector3.Dot(transform.position - aimRay.origin, aimRay.direction));
+        Vector3 origin = aimRay.origin + aimRay.direction * skip;
 
         RaycastHit hit;
-        bool found = Physics.Raycast(origin, ray.direction, out hit, maxZipDistance, zippable, QueryTriggerInteraction.Ignore) ||
-            Physics.SphereCast(origin, aimAssistRadius, ray.direction, out hit, maxZipDistance, zippable, QueryTriggerInteraction.Ignore);
+        bool foundZipTarget = Physics.Raycast(origin, aimRay.direction, out hit, maxZipDistance, zippable, QueryTriggerInteraction.Ignore) || Physics.SphereCast(origin, aimAssistRadius, aimRay.direction, out hit, maxZipDistance, zippable, QueryTriggerInteraction.Ignore);
 
         // distance 0 means the sphere started inside a collider and hit.point is meaningless.
-        if (!found || hit.distance <= 0f) return false;
-        if (Vector3.Distance(transform.position, hit.point) < minZipDistance) return false;
+        if (!foundZipTarget || hit.distance <= 0f) 
+            return false;
+
+        if (Vector3.Distance(transform.position, hit.point) < minZipDistance) 
+            return false;
 
         point = hit.point;
         return true;
@@ -242,13 +239,10 @@ public class WebZip : MonoBehaviour
         target = point;
         IsZipping = true;
         zipStartTime = Time.time;
-
         swinging.CancelSwingForZip();
         swinging.BeginZipMomentum();
-
-        launchDir = (target - rigidBody.position).normalized;
-        zipSpeed = Mathf.Max(zipStartSpeed, Vector3.Dot(rigidBody.linearVelocity, launchDir));
-
+        launchDirection = (target - rigidBody.position).normalized;
+        zipSpeed = Mathf.Max(zipStartSpeed, Vector3.Dot(rigidBody.linearVelocity, launchDirection));
         lineEnd = webTip.position;
         zipLine.positionCount = 2;
     }
@@ -273,7 +267,7 @@ public class WebZip : MonoBehaviour
         }
         else
         {
-            direction = launchDir;
+            direction = launchDirection;
         }
 
         direction = (direction + Vector3.up * exitUpBias).normalized;

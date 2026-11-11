@@ -76099,17 +76099,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a8beac8e1925e2146bfe1e6d0beb8a87, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerCamera
-  inputActions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
-  lookAction:
-    m_Name: Look
-    m_Type: 0
-    m_ExpectedControlType: 
-    m_Id: 87c6ce93-bf7e-48e0-89da-ebf991a5662c
-    m_Processors: 
-    m_Interactions: 
-    m_SingletonActionBindings: []
-    m_Flags: 0
-    m_Priority: 0
   orientation: {fileID: 329336287}
   player: {fileID: 1963176764}
   playerObj: {fileID: 1999820543}
@@ -76131,11 +76120,10 @@ MonoBehaviour:
   wallRun: {fileID: 1963176770}
   swinging: {fileID: 1963176768}
   orbital: {fileID: 1680723180}
-  yawDirection: 1
-  pitchDirection: 1
   diveTiltDown: 12
   climbTiltUp: 12
   tiltSharpness: 6
+  pitchOffset: 0
 --- !u!114 &330585552
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -503740,13 +503728,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
   moveSpeed: 110
+  walkSpeed: 80
+  sprintSpeed: 140
+  swingSpeed: 120
   airDrag: 0.3
   airDragQuadratic: 0.025
   postReleaseGravity: 10
   fallGravity: 12
   orientation: {fileID: 329336287}
   moveDirection: {x: 0, y: 0, z: 0}
-  inputActions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   playerHeight: 2
   groundMask:
     serializedVersion: 2
@@ -503762,6 +503752,8 @@ MonoBehaviour:
   isCharging: 0
   chargeRate: 55
   maxSlopeAngle: 40
+  exitingSlope: 0
+  slopeGravity: 80
   landingSpeedKeep: 0.7
   carryDuration: 1.2
   carryDragRatio: 0.1
@@ -503891,24 +503883,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c596199bb0f4cf74fa02c5990fc48956, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerSwinging
-  inputActions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
-  swingAction:
-    m_Name: Swing
-    m_Type: 0
-    m_ExpectedControlType: 
-    m_Id: d646343c-b929-4eb0-8501-ac2a0bdd27ff
-    m_Processors: 
-    m_Interactions: 
-    m_SingletonActionBindings: []
-    m_Flags: 0
-    m_Priority: 0
   lineRenderer: {fileID: 1963176767}
   webTip: {fileID: 996953925}
   cameraTransform: {fileID: 330585546}
   grappable:
     serializedVersion: 2
     m_Bits: 128
-  maxSwingDistance: 55
+  maxSwingDistance: 65
   minAnchorDistance: 9
   minAnchorHeight: 5
   anchorSphereRadius: 1.5

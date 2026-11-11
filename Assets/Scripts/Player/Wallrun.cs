@@ -18,94 +18,94 @@ public class Wallrun : MonoBehaviour
     public enum WallMode { None, Running, Climbing, Crawling }
 
     [Header("References")]
-    public Transform cameraTransform;
+    [SerializeField] private Transform cameraTransform;
     public LayerMask wallMask;
 
     [Header("Detection")]
     [Tooltip("Must be smaller than your collider's radius, or the probe starts inside the wall.")]
-    public float probeRadius = 0.3f;
-    public float probeDistance = 1.2f;
+    [SerializeField] private float probeRadius = 0.3f;
+    [SerializeField] private float probeDistance = 1.2f;
     [Tooltip("Surfaces whose normal tilts more than this up/down are not walls (0 = perfectly vertical).")]
-    [Range(0f, 0.5f)] public float maxWallNormalY = 0.25f;
+    [Range(0f, 0.5f)] [SerializeField] private float maxWallNormalY = 0.25f;
     [Tooltip("Hit the wall within this many degrees of head-on and you climb instead of run.")]
-    public float headOnAngle = 35f;
+    [SerializeField] private float headOnAngle = 35f;
     [Tooltip("How long the wall may be missing before you fall off or vault over the top.")]
-    public float lostContactGrace = 0.15f;
-    public float reattachDelay = 0.3f;
+    [SerializeField] private float lostContactGrace = 0.15f;
+    [SerializeField] private float reattachDelay = 0.3f;
     [Tooltip("Smooths the wall normal so bumpy or faceted walls don't wobble the run direction. Lower = smoother.")]
-    public float normalSmoothing = 15f;
+    [SerializeField] private float normalSmoothing = 15f;
 
     [Header("Speed Thresholds (horizontal m/s)")]
     [Tooltip("Need at least this much speed (and the run key) to wall run or climb. Below it you crawl.")]
-    public float minRunSpeed = 18f;
+    [SerializeField] private float minRunSpeed = 18f;
     [Tooltip("A run or climb that decays below this turns into a crawl.")]
-    public float dropToCrawlSpeed = 10f;
+    [SerializeField] private float dropToCrawlSpeed = 10f;
 
     [Header("Wall Run (sideways)")]
-    public float maxRunSpeed = 70f;
+    [SerializeField] private float maxRunSpeed = 70f;
     [Tooltip("m/s lost per second while running. 0 = lasts as long as the key is held.")]
-    public float runSpeedDecay = 1f;
+    [SerializeField] private float runSpeedDecay = 1f;
 
     [Header("Wall Climb (head-on)")]
     [Tooltip("Fraction of your horizontal speed that becomes upward speed.")]
-    public float climbConversion = 0.9f;
-    public float maxClimbSpeed = 45f;
+    [SerializeField] private float climbConversion = 0.9f;
+    [SerializeField] private float maxClimbSpeed = 45f;
     [Tooltip("m/s lost per second while climbing. 0 = lasts as long as the key is held.")]
-    public float climbSpeedDecay = 0f;
-    public float climbSteerSpeed = 6f;
+    [SerializeField] private float climbSpeedDecay = 0f;
+    [SerializeField] private float climbSteerSpeed = 6f;
 
     [Header("Wall Crawl")]
-    public float crawlSpeed = 9f;
+    [SerializeField] private float crawlSpeed = 9f;
     [Tooltip("How close you must be when walking into a wall for the crawl to grab on.")]
-    public float crawlAttachDistance = 0.7f;
+    [SerializeField] private float crawlAttachDistance = 0.7f;
     [Tooltip("1 = must walk straight at the wall, 0 = any angle. Stops you sticking to walls you only brush past.")]
-    [Range(0f, 1f)] public float crawlApproachDot = 0.5f;
+    [Range(0f, 1f)][SerializeField] private float crawlApproachDot = 0.5f;
 
     [Header("Corners (wall run)")]
     [Tooltip("How far ahead / around the edge to look for the next wall.")]
-    public float cornerReach = 2f;
+    [SerializeField] private float cornerReach = 2f;
     [Tooltip("Extra steering right after a corner so the turn is tight even at high speed.")]
-    public float cornerSteerAcceleration = 1500f;
-    public float cornerSteerTime = 0.25f;
+    [SerializeField] private float cornerSteerAcceleration = 1500f;
+    [SerializeField] private float cornerSteerTime = 0.25f;
     [Tooltip("Minimum time between two corner turns. Stops back-and-forth flipping on busy facades.")]
-    public float cornerCooldown = 0.6f;
+    [SerializeField] private float cornerCooldown = 0.6f;
     [Tooltip("The wall must be gone this long before a convex corner is attempted (skips window gaps).")]
-    public float outerCornerConfirm = 0.06f;
+    [SerializeField] private float outerCornerConfirm = 0.06f;
     [Tooltip("A wall ahead only counts as a corner if it also exists this far above and below (rejects pillars, balconies).")]
-    public float cornerHeightCheck = 1.5f;
+    [SerializeField] private float cornerHeightCheck = 1.5f;
 
     [Header("Camera")]
     [Tooltip("How much of the wall run's turning is handed to the camera. 0 = none, 1 = fully follows.")]
-    [Range(0f, 1f)] public float cameraFollow = 1f;
+    [Range(0f, 1f)][SerializeField] private float cameraFollow = 1f;
     [Tooltip("Higher = the camera catches up with the turn faster.")]
-    public float cameraTurnSharpness = 8f;
+    [SerializeField] private float cameraTurnSharpness = 8f;
     [Tooltip("Ignore wall-heading changes smaller than this per physics step (degrees). Filters mesh noise.")]
-    public float cameraDeadzone = 0.05f;
+    [SerializeField] private float cameraDeadzone = 0.05f;
     [Tooltip("Fastest the camera may be turned by a wall run (degrees per second).")]
-    public float maxCameraTurnRate = 240f;
+    [SerializeField] private float maxCameraTurnRate = 240f;
 
     [Header("Sticking")]
     [Tooltip("Constant speed into the wall so you stay in contact.")]
-    public float stickSpeed = 3f;
+    [SerializeField] private float stickSpeed = 3f;
     [Tooltip("How quickly velocity bends toward the wall velocity (m/s per second).")]
-    public float steerAcceleration = 400f;
+    [SerializeField] private float steerAcceleration = 400f;
     [Tooltip("A run/climb that is blocked (ceiling, corner) for this long drops you off.")]
-    public float stuckTime = 0.4f;
+    [SerializeField] private float stuckTime = 0.4f;
 
     [Header("Leap (jump off the wall)")]
-    public float leapAwaySpeed = 14f;
-    public float leapUpSpeed = 14f;
+    [SerializeField] private float leapAwaySpeed = 14f;
+    [SerializeField] private float leapUpSpeed = 14f;
     [Tooltip("Fraction of your speed along the wall that survives the leap.")]
-    [Range(0f, 1f)] public float leapMomentumKeep = 0.8f;
+    [Range(0f, 1f)] [SerializeField] private float leapMomentumKeep = 0.8f;
     [Tooltip("Upward speed above this is moved away from the wall instead (stops rocket-straight-up leaps).")]
-    public float maxLeapUpSpeed = 28f;
-    public float maxExitSpeed = 100f;
-    public float leapComboGain = 0.5f;
-    [Range(0f, 1f)] public float leapDragRelief = 0.8f;
+    [SerializeField] private float maxLeapUpSpeed = 28f;
+    [SerializeField] private float maxExitSpeed = 100f;
+    [SerializeField] private float leapComboGain = 0.5f;
+    [Range(0f, 1f)][SerializeField] private float leapDragRelief = 0.8f;
 
     [Header("Ledge Vault")]
     [Tooltip("When a climb or crawl reaches the top of the wall, extra speed over the edge.")]
-    public float ledgeVaultSpeed = 8f;
+    [SerializeField] private float ledgeVaultSpeed = 8f;
 
     // Read these from other scripts (camera, animation, UI...)
 
@@ -119,18 +119,17 @@ public class Wallrun : MonoBehaviour
     public Vector3 WallNormal => wallNormal;
 
     /// <summary>The direction of travel along the wall while running.</summary>
-    public Vector3 RunDirection => runDir;
+    public Vector3 RunDirection => runDirection;
 
-    private Rigidbody rb;
+    private Rigidbody rigidBody;
     private PlayerSwinging swinging;
     private PlayerMovement movement;
     private WebZip zip;
     private InputAction moveAction;
     private InputAction jumpAction;
     private InputAction runAction;
-
     private Vector3 wallNormal;
-    private Vector3 runDir;
+    private Vector3 runDirection;
     private float wallSpeed;
     private float attachTime;
     private float nextAttachTime;
@@ -146,11 +145,10 @@ public class Wallrun : MonoBehaviour
     /// <summary>Unity message. Caches sibling components and looks up the "Move", "Jump" and "Sprint" input actions.</summary>
     private void Awake()
     {
-        rb = GetComponent<Rigidbody>();
+        rigidBody = GetComponent<Rigidbody>();
         swinging = GetComponent<PlayerSwinging>();
         movement = GetComponent<PlayerMovement>();
         zip = GetComponent<WebZip>();
-
         moveAction = InputSystem.actions.FindAction("Move");
         jumpAction = InputSystem.actions.FindAction("Jump");
         runAction = InputSystem.actions.FindAction("Sprint");
@@ -166,20 +164,20 @@ public class Wallrun : MonoBehaviour
     /// <summary>Unity message. Steps the wall physics while attached, otherwise checks whether to attach.</summary>
     private void FixedUpdate()
     {
-        if (IsActive) StepWall();
+        if (IsActive) 
+            StepWall();
         else TryAttach();
     }
 
     /// <summary>
-    /// Gives the yaw the camera should turn this frame (degrees) to follow a wall-run corner. Call once per frame from a camera script
+    /// Gives the yaw the camera should turn this frame (degrees) to follow a wall-run corner.
     /// (see <c>CameraEffects</c>). The stored turn is eased out exponentially and limited by <see cref="maxCameraTurnRate"/>.
     /// </summary>
     /// <returns>Degrees to add to the camera yaw this frame; zero when no turn is pending.</returns>
     public float ConsumeYawDelta()
     {
         float step = pendingYaw * (1f - Mathf.Exp(-cameraTurnSharpness * Time.deltaTime));
-        float maxStep = maxCameraTurnRate * Time.deltaTime;
-        step = Mathf.Clamp(step, -maxStep, maxStep);
+        step = Mathf.Clamp(step, -(maxCameraTurnRate * Time.deltaTime), maxCameraTurnRate * Time.deltaTime);
         pendingYaw -= step;
         return step;
     }
@@ -205,64 +203,71 @@ public class Wallrun : MonoBehaviour
     /// </summary>
     private void TryAttach()
     {
-        if (Time.time < nextAttachTime) return;
-        if (movement.isSwinging || (zip != null && zip.IsZipping)) return;
+        if (Time.time < nextAttachTime) 
+            return;
+        if (movement.isSwinging || (zip != null && zip.IsZipping)) 
+            return;
 
-        Vector3 velocity = rb.linearVelocity;
-        Vector3 flatVel = new Vector3(velocity.x, 0f, velocity.z);
-        float flatSpeed = flatVel.magnitude;
-        bool fast = flatSpeed >= minRunSpeed;
+        Vector3 flatVelocity = new Vector3(rigidBody.linearVelocity.x, 0f, rigidBody.linearVelocity.z);
+        float flatSpeed = flatVelocity.magnitude;
 
         // Wall run / climb need the run key. Crawling doesn't, just walk into the wall.
-        if (fast && !RunHeld) return;
+        if ((flatSpeed >= minRunSpeed) && !RunHeld) 
+            return;
 
         RaycastHit hit;
-        if (fast)
+        if (flatSpeed >= minRunSpeed)
         {
             // Probe ahead far enough to catch the wall before collision eats speed
-            Vector3 forward = flatVel / flatSpeed;
-            float reach = probeDistance + flatSpeed * Time.fixedDeltaTime;
-            if (!ProbeWall(forward, reach, out hit))
+            Vector3 forward = flatVelocity / flatSpeed;
+            if (!ProbeWall(forward, probeDistance + flatSpeed * Time.fixedDeltaTime, out hit))
             {
                 // Running parallel to a wall: check both sides.
-                Vector3 right = Vector3.Cross(Vector3.up, forward);
-                if (!ProbeWall(right, probeDistance, out hit) && !ProbeWall(-right, probeDistance, out hit))
+                if (!ProbeWall(Vector3.Cross(Vector3.up, forward), probeDistance, out hit) && !ProbeWall(-Vector3.Cross(Vector3.up, forward), probeDistance, out hit))
                     return;
             }
         }
         else
         {
-            if (!movement.IsGrounded) return;
+            if (!movement.IsGrounded) 
+                return;
 
-            Vector3 input = GetInputDirection();
-            if (input == Vector3.zero) return;
-            if (!ProbeWall(input, crawlAttachDistance, out hit)) return;
+            Vector3 inputDirection = GetInputDirection();
+            if (inputDirection == Vector3.zero) 
+                return;
 
-            Vector3 hitFlat = new Vector3(hit.normal.x, 0f, hit.normal.z).normalized;
-            if (Vector3.Dot(input, -hitFlat) < crawlApproachDot) return;
+            if (!ProbeWall(inputDirection, crawlAttachDistance, out hit)) 
+                return;
+
+            if (Vector3.Dot(inputDirection, -new Vector3(hit.normal.x, 0f, hit.normal.z).normalized) < crawlApproachDot) 
+                return;
         }
 
-        Vector3 n = hit.normal;
-        Vector3 flatN = new Vector3(n.x, 0f, n.z).normalized;
-
         WallMode mode;
-        if (!fast)
+        if (!(flatSpeed >= minRunSpeed))
         {
             mode = WallMode.Crawling;
         }
         else
         {
-            float incidence = Vector3.Angle(-flatN, flatVel);
-            mode = incidence <= headOnAngle ? WallMode.Climbing : WallMode.Running;
+            if (Vector3.Angle(-new Vector3(hit.normal.x, 0f, hit.normal.z).normalized, flatVelocity) <= headOnAngle)
+            {
+                mode = WallMode.Climbing;
+            }
+            else
+            {
+                mode = WallMode.Running;
+            }
         }
 
-        if (mode == WallMode.Running && movement.IsGrounded) return;
+        if (mode == WallMode.Running && movement.IsGrounded) 
+            return;
 
         if (mode == WallMode.Running)
         {
-            Vector3 along = Vector3.ProjectOnPlane(flatVel, n);
+            Vector3 along = Vector3.ProjectOnPlane(flatVelocity, hit.normal);
             if (along.sqrMagnitude < 0.0001f) return;
-            runDir = along.normalized;
+            runDirection = along.normalized;
             wallSpeed = Mathf.Min(flatSpeed, maxRunSpeed);
         }
         else if (mode == WallMode.Climbing)
@@ -274,7 +279,7 @@ public class Wallrun : MonoBehaviour
             wallSpeed = 0f;
         }
 
-        wallNormal = n;
+        wallNormal = hit.normal;
         Mode = mode;
         IsActive = true;
         attachTime = Time.time;
@@ -283,7 +288,6 @@ public class Wallrun : MonoBehaviour
         cornerTimer = 0f;
         pendingYaw = 0f;
         lastCornerTime = -999f;
-
         swinging.BeginZipMomentum();
     }
 
@@ -295,7 +299,7 @@ public class Wallrun : MonoBehaviour
     private bool ProbeWall(Vector3 dir, float distance, out RaycastHit hit)
     {
         // hit.distance == 0 means the sphere started inside a collider, normal is meaningless then
-        return Physics.SphereCast(rb.position, probeRadius, dir, out hit, distance, wallMask,
+        return Physics.SphereCast(rigidBody.position, probeRadius, dir, out hit, distance, wallMask,
                    QueryTriggerInteraction.Ignore)
                && hit.distance > 0f
                && Mathf.Abs(hit.normal.y) <= maxWallNormalY;
@@ -312,8 +316,6 @@ public class Wallrun : MonoBehaviour
     /// </summary>
     private void StepWall()
     {
-        float dt = Time.fixedDeltaTime;
-
         // swing or zip took over
         if (movement.isSwinging || (zip != null && zip.IsZipping))
         {
@@ -334,26 +336,23 @@ public class Wallrun : MonoBehaviour
             input = Vector2.zero;
         }
 
-        bool hasInput = input.sqrMagnitude > 0.01f;
-        bool runHeld = RunHeld;
-
         bool keepClinging;
         if (Mode == WallMode.Crawling)
         {
-            keepClinging = runHeld || hasInput;
+            keepClinging = RunHeld || input.sqrMagnitude > 0.01f;
         }
         else
         {
-            keepClinging = runHeld;
+            keepClinging = RunHeld;
         }
 
         if (!keepClinging)
         {
-            EndWall(rb.linearVelocity, 0f, 0f);
+            EndWall(rigidBody.linearVelocity, 0f, 0f);
             return;
         }
 
-        Vector3 runBefore = runDir;
+        Vector3 runBefore = runDirection;
 
         // Inner corner: a wall right ahead while running.
         if (Mode == WallMode.Running)
@@ -362,25 +361,22 @@ public class Wallrun : MonoBehaviour
         // Re-probe so the wall normal follows curves (smoothed, so bumpy walls don't wobble the run).
         if (ProbeWall(-wallNormal, probeDistance, out RaycastHit hit))
         {
-            float k = 1f - Mathf.Exp(-normalSmoothing * dt);
-            wallNormal = Vector3.Slerp(wallNormal, hit.normal, k).normalized;
+            wallNormal = Vector3.Slerp(wallNormal, hit.normal, (1f - Mathf.Exp(-normalSmoothing * Time.fixedDeltaTime))).normalized;
             lostContactTimer = 0f;
         }
         else
         {
-            lostContactTimer += dt;
+            lostContactTimer += Time.fixedDeltaTime;
 
             // Wall gone: only look for a convex corner once it is clearly more than a gap.
-            bool turned = Mode == WallMode.Running && lostContactTimer >= outerCornerConfirm && TryOuterCorner();
-
-            if (turned)
+            if (Mode == WallMode.Running && lostContactTimer >= outerCornerConfirm && TryOuterCorner())
             {
                 lostContactTimer = 0f;
             }
             else if (lostContactTimer > lostContactGrace)
             {
                 // Reached the top of the wall
-                Vector3 exit = rb.linearVelocity;
+                Vector3 exit = rigidBody.linearVelocity;
                 if ((Mode == WallMode.Climbing || Mode == WallMode.Crawling) && exit.y > 1f)
                     exit += -wallNormal * ledgeVaultSpeed;
                 EndWall(exit, 0f, 0f);
@@ -392,56 +388,82 @@ public class Wallrun : MonoBehaviour
         Vector3 wallRight = Vector3.Cross(wallNormal, Vector3.up).normalized;
         Vector3 wallUp = Vector3.Cross(wallRight, wallNormal);
 
-        Vector3 target;
+        Vector3 targetWallVelocity;
         switch (Mode)
         {
             case WallMode.Running:
-                wallSpeed = Mathf.Max(0f, wallSpeed - runSpeedDecay * dt);
-                runDir = Vector3.ProjectOnPlane(runDir, wallNormal).normalized;
-                target = runDir * wallSpeed;
-                AddCameraYaw(runBefore, runDir);
+                wallSpeed = Mathf.Max(0f, wallSpeed - runSpeedDecay * Time.fixedDeltaTime);
+                runDirection = Vector3.ProjectOnPlane(runDirection, wallNormal).normalized;
+                targetWallVelocity = runDirection * wallSpeed;
+                AddCameraYaw(runBefore, runDirection);
                 if (wallSpeed < dropToCrawlSpeed) Mode = WallMode.Crawling;
                 break;
 
             case WallMode.Climbing:
-                wallSpeed = Mathf.Max(0f, wallSpeed - climbSpeedDecay * dt);
-                target = wallUp * wallSpeed + wallRight * (input.x * climbSteerSpeed);
+                wallSpeed = Mathf.Max(0f, wallSpeed - climbSpeedDecay * Time.fixedDeltaTime);
+                targetWallVelocity = wallUp * wallSpeed + wallRight * (input.x * climbSteerSpeed);
                 if (wallSpeed < dropToCrawlSpeed) Mode = WallMode.Crawling;
                 break;
 
             default: // crawling
-                target = (wallUp * input.y + wallRight * input.x) * crawlSpeed;
+                targetWallVelocity = (wallUp * input.y + wallRight * input.x) * crawlSpeed;
                 break;
         }
 
         // Blocked by a ceiling or a corner that could not be followed: let go.
         if ((Mode == WallMode.Running || Mode == WallMode.Climbing) && Time.time - attachTime > 0.3f)
         {
-            Vector3 dir = target.sqrMagnitude > 0.01f ? target.normalized : Vector3.zero;
-            float along = Vector3.Dot(rb.linearVelocity, dir);
-            stuckTimer = along < wallSpeed * 0.2f ? stuckTimer + dt : 0f;
+            Vector3 direction;
+            if (targetWallVelocity.sqrMagnitude > 0.01f)
+            {
+                direction = targetWallVelocity.normalized;
+            }
+            else
+            {
+                direction = Vector3.zero;
+            }
+
+            if (Vector3.Dot(rigidBody.linearVelocity, direction) < wallSpeed * 0.2f)
+            {
+                stuckTimer = stuckTimer + Time.fixedDeltaTime;
+            }
+            else
+            {
+                stuckTimer = 0f;
+            }
+
             if (stuckTimer > stuckTime)
             {
-                EndWall(rb.linearVelocity, 0f, 0f);
+                EndWall(rigidBody.linearVelocity, 0f, 0f);
                 return;
             }
         }
 
         // Reached the ground (and not climbing away from it).
-        if (movement.IsGrounded && Time.time - attachTime > 0.2f && rb.linearVelocity.y <= 0.5f)
+        if (movement.IsGrounded && Time.time - attachTime > 0.2f && rigidBody.linearVelocity.y <= 0.5f)
         {
             EndWallOnGround();
             return;
         }
 
-        target -= wallNormal * stickSpeed;
+        targetWallVelocity -= wallNormal * stickSpeed;
 
-        cornerTimer -= dt;
-        float accel = cornerTimer > 0f ? cornerSteerAcceleration : steerAcceleration;
-        rb.linearVelocity = Vector3.MoveTowards(rb.linearVelocity, target, accel * dt);
+        cornerTimer -= Time.fixedDeltaTime;
+
+        float currentAcceleration;
+        if (cornerTimer > 0f)
+        {
+            currentAcceleration = cornerSteerAcceleration;
+        }
+        else
+        {
+            currentAcceleration = steerAcceleration;
+        }
+
+        rigidBody.linearVelocity = Vector3.MoveTowards(rigidBody.linearVelocity, targetWallVelocity, currentAcceleration * Time.fixedDeltaTime);
 
         // PlayerMovement re-enables gravity every frame while swingMomentum is set, so cancelling it here.
-        rb.AddForce(-Physics.gravity, ForceMode.Acceleration);
+        rigidBody.AddForce(-Physics.gravity, ForceMode.Acceleration);
     }
 
     // ------------------------------------------------------------------------------- Corners
@@ -453,17 +475,19 @@ public class Wallrun : MonoBehaviour
     /// <returns><c>true</c> if the run switched to the new wall.</returns>
     private bool TryInnerCorner()
     {
-        if (Time.time - lastCornerTime < cornerCooldown) return false;
+        if (Time.time - lastCornerTime < cornerCooldown) 
+            return false;
 
-        float reach = cornerReach + wallSpeed * 0.1f;
-        if (!ProbeWall(runDir, reach, out RaycastHit ahead)) return false;
-        if (Vector3.Dot(ahead.normal, -runDir) < 0.5f) return false;
+        float reachDistance = cornerReach + wallSpeed * 0.1f;
+        if (!ProbeWall(runDirection, reachDistance, out RaycastHit ahead)) 
+            return false;
 
-        Vector3 lift = Vector3.up * cornerHeightCheck;
-        float rayLength = reach + probeRadius;
+        if (Vector3.Dot(ahead.normal, -runDirection) < 0.5f) 
+            return false;
+
         for (int i = -1; i <= 1; i += 2)
         {
-            if (!Physics.Raycast(rb.position + lift * i, runDir, out RaycastHit extra, rayLength, wallMask, QueryTriggerInteraction.Ignore) || Vector3.Dot(extra.normal, ahead.normal) < 0.9f)
+            if (!Physics.Raycast(rigidBody.position + (Vector3.up * cornerHeightCheck) * i, runDirection, out RaycastHit extra, reachDistance + probeRadius, wallMask, QueryTriggerInteraction.Ignore) || Vector3.Dot(extra.normal, ahead.normal) < 0.9f)
                 return false;
         }
 
@@ -478,16 +502,18 @@ public class Wallrun : MonoBehaviour
     /// <returns><c>true</c> if the run switched to the wall around the corner.</returns>
     private bool TryOuterCorner()
     {
-        if (Time.time - lastCornerTime < cornerCooldown) return false;
-
-        // Look back at the new face from behind the old wall's plane.
-        Vector3 origin = rb.position - wallNormal * cornerReach + runDir * 0.5f;
-        float distance = cornerReach + 1f + wallSpeed * lostContactTimer;
-        if (!Physics.SphereCast(origin, probeRadius, -runDir, out RaycastHit around, distance, wallMask, QueryTriggerInteraction.Ignore))
+        if (Time.time - lastCornerTime < cornerCooldown)
             return false;
 
-        if (around.distance <= 0f || Mathf.Abs(around.normal.y) > maxWallNormalY) return false;
-        if (Vector3.Dot(around.normal, runDir) < 0.3f) return false; // must face the way we are heading
+        float reachDistance = cornerReach + 1f + wallSpeed * lostContactTimer;
+        if (!Physics.SphereCast(rigidBody.position - wallNormal * cornerReach + runDirection * 0.5f, probeRadius, -runDirection, out RaycastHit around, reachDistance, wallMask, QueryTriggerInteraction.Ignore))
+            return false;
+
+        if (around.distance <= 0f || Mathf.Abs(around.normal.y) > maxWallNormalY) 
+            return false;
+
+        if (Vector3.Dot(around.normal, runDirection) < 0.3f) 
+            return false; // must face the way we are heading
 
         SwitchWall(around.normal, false);
         return true;
@@ -498,16 +524,26 @@ public class Wallrun : MonoBehaviour
     /// around into it for outer corners) and starts the temporary high-steering window and corner cooldown.
     /// </summary>
     /// <param name="newNormal">Normal of the new wall.</param>
-    /// <param name="inner"><c>true</c> for a concave (inner) corner, <c>false</c> for a convex (outer) one.</param>
-    private void SwitchWall(Vector3 newNormal, bool inner)
+    /// <param name="isConcave"><c>true</c> for a concave (inner) corner, <c>false</c> for a convex (outer) one.</param>
+    private void SwitchWall(Vector3 newNormal, bool isConcave)
     {
         // Along the new wall, heading away from the old wall (inner) or around into it (outer).
         Vector3 tangent = Vector3.Cross(newNormal, Vector3.up).normalized;
-        Vector3 reference = inner ? wallNormal : -wallNormal;
-        if (Vector3.Dot(tangent, reference) < 0f) tangent = -tangent;
+        Vector3 reference;
+        if (isConcave)
+        {
+            reference = wallNormal;
+        }
+        else
+        {
+            reference = -wallNormal;
+        }
+
+        if (Vector3.Dot(tangent, reference) < 0f) 
+            tangent = -tangent;
 
         wallNormal = newNormal;
-        runDir = tangent;
+        runDirection = tangent;
         stuckTimer = 0f;
         cornerTimer = cornerSteerTime;
         lastCornerTime = Time.time;
@@ -523,9 +559,15 @@ public class Wallrun : MonoBehaviour
     {
         Vector3 a = new Vector3(before.x, 0f, before.z);
         Vector3 b = new Vector3(after.x, 0f, after.z);
-        if (a.sqrMagnitude < 0.0001f || b.sqrMagnitude < 0.0001f) return;
+
+        if (a.sqrMagnitude < 0.0001f || b.sqrMagnitude < 0.0001f)
+            return;
+
         float delta = Vector3.SignedAngle(a, b, Vector3.up);
-        if (Mathf.Abs(delta) < cameraDeadzone) return;
+
+        if (Mathf.Abs(delta) < cameraDeadzone)
+            return;
+
         pendingYaw += delta * cameraFollow;
     }
 
@@ -538,8 +580,7 @@ public class Wallrun : MonoBehaviour
     /// </summary>
     private void Leap()
     {
-        Vector3 along = Vector3.ProjectOnPlane(rb.linearVelocity, wallNormal) * leapMomentumKeep;
-        Vector3 exit = along + wallNormal * leapAwaySpeed + Vector3.up * leapUpSpeed;
+        Vector3 exit = (Vector3.ProjectOnPlane(rigidBody.linearVelocity, wallNormal) * leapMomentumKeep) + wallNormal * leapAwaySpeed + Vector3.up * leapUpSpeed;
 
         // A fast climb would otherwise launch you straight up: send the excess away from the wall.
         if (exit.y > maxLeapUpSpeed)
@@ -550,10 +591,8 @@ public class Wallrun : MonoBehaviour
         }
 
         exit = Vector3.ClampMagnitude(exit, maxExitSpeed);
-
         bool wasFast = Mode != WallMode.Crawling;
         movement.jumpConsumed = true; // this press must not also trigger an air jump or ground jump
-
         EndWall(exit, wasFast ? leapComboGain : 0f, wasFast ? leapDragRelief : 0f);
     }
 
@@ -588,15 +627,15 @@ public class Wallrun : MonoBehaviour
     /// </returns>
     private Vector3 GetInputDirection()
     {
-        if (moveAction == null) return Vector3.zero;
-        Vector2 input = moveAction.ReadValue<Vector2>();
+        if (moveAction == null) 
+            return Vector3.zero;
 
         Vector3 forward = Vector3.ProjectOnPlane(cameraTransform.forward, Vector3.up).normalized;
         Vector3 right = Vector3.ProjectOnPlane(cameraTransform.right, Vector3.up).normalized;
-        Vector3 dir = forward * input.y + right * input.x;
-        if (dir.sqrMagnitude > 0.01f)
+        Vector3 direction = forward * moveAction.ReadValue<Vector2>().y + right * moveAction.ReadValue<Vector2>().x;
+        if (direction.sqrMagnitude > 0.01f)
         {
-            return dir.normalized;
+            return direction.normalized;
         }
         else
         {
